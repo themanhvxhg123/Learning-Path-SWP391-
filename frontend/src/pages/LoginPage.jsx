@@ -18,11 +18,11 @@ const validateEmail = (email) => {
 export default function LoginPage() {
   const navigate = useNavigate();
 
-  const [form, setForm]           = useState({ email: '', password: '' });
-  const [errors, setErrors]       = useState({});
+  const [form, setForm]                 = useState({ email: '', password: '' });
+  const [errors, setErrors]             = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [remember, setRemember]   = useState(false);
-  const submittingRef             = useRef(false); // sync guard — blocks before React re-renders
+  const [remember, setRemember]         = useState(false);
+  const submittingRef                   = useRef(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(REMEMBER_KEY);
@@ -48,7 +48,6 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Chặn đồng bộ ngay — trước khi React kịp re-render
     if (submittingRef.current) return;
 
     const errs = validate();
@@ -66,10 +65,19 @@ export default function LoginPage() {
         } else {
           localStorage.removeItem(REMEMBER_KEY);
         }
+
         sessionStorage.setItem('user', JSON.stringify(data.user));
         toast.success(data.message);
-        // Navigate ngay — không setTimeout, button vẫn disabled cho đến khi unmount
-        navigate(data.user.isFirstLogin ? '/survey' : '/home');
+
+        // ✅ Điều hướng theo role
+        if (data.user.isFirstLogin) {
+          navigate('/survey');
+        } else if (data.user.roles?.includes('Admin')) {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/home');
+        }
+
       } else {
         toast.error(data.message || 'Đăng nhập thất bại.');
         submittingRef.current = false;

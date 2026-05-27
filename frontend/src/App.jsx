@@ -15,8 +15,15 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
 import MainLayout from './components/layout/MainLayout';
+import AdminRoute from './components/common/AdminRoute';
+import AdminLayout from './components/layout/AdminLayout';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminCoursesPage from './pages/AdminCoursesPage';
+import AdminMentorsPage from './pages/AdminMentorsPage';
+import AdminCategoriesPage from './pages/AdminCategoriesPage';
+import AdminReportPage from './pages/AdminReportPage';
 
-/** Guard: redirect về /login nếu chưa đăng nhập */
 function ProtectedRoute({ children }) {
   const user = sessionStorage.getItem('user');
   return user ? children : <Navigate to="/login" replace />;
@@ -56,12 +63,30 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/home" replace />} />
-          <Route path="home" element={<HomePage />} />
-          <Route path="courses" element={<CourseListPage />} />
-          <Route path="courses/:id" element={<CourseDetailPage />} />
-          <Route path="my-courses" element={<MyCoursesListPage />} />
+          <Route path="home"                       element={<HomePage />} />
+          <Route path="courses"                    element={<CourseListPage />} />
+          <Route path="courses/:id"                element={<CourseDetailPage />} />
+          <Route path="my-courses"                 element={<MyCoursesListPage />} />
           <Route path="my-courses/:courseId/learn" element={<CourseLearningPage />} />
-          <Route path="profile" element={<ProfilePage />} />
+          <Route path="profile"                    element={<ProfilePage />} />
+        </Route>
+
+        {/* Admin — cần login + role Admin */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminLayout />
+            </AdminRoute>
+          }
+        >
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="courses" element={<AdminCoursesPage />} />
+          <Route path="mentors" element={<AdminMentorsPage />} />
+          <Route path="categories" element={<AdminCategoriesPage />} />
+          <Route path="report" element={<AdminReportPage />} />
         </Route>
 
         {/* Fallback */}
