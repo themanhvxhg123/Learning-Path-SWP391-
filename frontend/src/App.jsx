@@ -20,11 +20,19 @@ import MentorStudentProgressPage from './pages/mentor/MentorStudentProgressPage'
 import MentorCoursePlaceholder from './components/mentor/MentorCoursePlaceholder';
 
 import MainLayout from './components/layout/MainLayout';
-import MentorLayout from './components/layout/MentorLayout';
-import ProtectedRoute from './components/common/ProtectedRoute';
+import AdminRoute from './components/common/AdminRoute';
+import AdminLayout from './components/layout/AdminLayout';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminCoursesPage from './pages/AdminCoursesPage';
+import AdminMentorsPage from './pages/AdminMentorsPage';
+import AdminCategoriesPage from './pages/AdminCategoriesPage';
+import AdminReportPage from './pages/AdminReportPage';
 
-const MENTOR_BLOCK_REDIRECTS = { Mentor: '/mentor/courses' };
-const STUDENT_MENTOR_ROUTE_REDIRECTS = { Student: '/courses' };
+function ProtectedRoute({ children }) {
+  const user = sessionStorage.getItem('user');
+  return user ? children : <Navigate to="/login" replace />;
+}
 
 export default function App() {
   return (
@@ -134,36 +142,31 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/mentor/courses" replace />} />
-          <Route path="courses/create" element={
-            <MentorCoursePlaceholder
-              title="Tạo khóa học"
-              description="Tạo khóa học mới và thiết lập thông tin cơ bản."
-            />
-          } />
-          <Route path="courses/:courseId/edit" element={
-            <MentorCoursePlaceholder
-              title="Chỉnh sửa khóa học"
-              description="Cập nhật thông tin khóa học."
-            />
-          } />
-          <Route path="courses/:courseId/content" element={
-            <MentorCoursePlaceholder
-              title="Quản lý nội dung"
-              description="Quản lý chương, chặng, bài học và học liệu."
-            />
-          } />
-          <Route path="courses/:courseId" element={
-            <MentorCoursePlaceholder
-              title="Chi tiết khóa học"
-              description="Xem tổng quan khóa học."
-            />
-          } />
-          <Route path="courses" element={<MentorCoursesPage />} />
-          <Route path="news" element={<MentorNewsPage />} />
-          <Route path="student-progress" element={<MentorStudentProgressPage />} />
-          <Route path="paths" element={<Navigate to="/mentor/courses" replace />} />
-          <Route path="*" element={<Navigate to="/mentor/courses" replace />} />
+          <Route index element={<Navigate to="/home" replace />} />
+          <Route path="home"                       element={<HomePage />} />
+          <Route path="courses"                    element={<CourseListPage />} />
+          <Route path="courses/:id"                element={<CourseDetailPage />} />
+          <Route path="my-courses"                 element={<MyCoursesListPage />} />
+          <Route path="my-courses/:courseId/learn" element={<CourseLearningPage />} />
+          <Route path="profile"                    element={<ProfilePage />} />
+        </Route>
+
+        {/* Admin — cần login + role Admin */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminLayout />
+            </AdminRoute>
+          }
+        >
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="courses" element={<AdminCoursesPage />} />
+          <Route path="mentors" element={<AdminMentorsPage />} />
+          <Route path="categories" element={<AdminCategoriesPage />} />
+          <Route path="report" element={<AdminReportPage />} />
         </Route>
 
         {/* Student-specific routes placeholder */}
