@@ -42,7 +42,7 @@ function buildLessonFromNode(node, lessonId) {
   const primary = materials[0];
   const type = mapMaterialType(primary?.MaterialType);
   const textMaterial = materials.find((m) => m.MaterialType === 'TEXT');
-  const textBody = stripHtml(textMaterial?.Content);
+  const textBody = stripHtml(textMaterial?.MaterialUrl ?? textMaterial?.Content);
   const body =
     textBody ||
     node.Description ||

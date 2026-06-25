@@ -29,7 +29,7 @@ function StatPill({ label, value }) {
         textAlign: 'center',
       }}
     >
-      <Typography sx={{ fontSize: 18, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
+      <Typography sx={{ fontSize: 16, fontWeight: 600, color: TEXT, lineHeight: 1.2 }}>
         {value}
       </Typography>
       <Typography sx={{ fontSize: 11, fontWeight: 500, color: MUTED, mt: 0.25, lineHeight: 1.3 }}>

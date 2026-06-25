@@ -18,8 +18,8 @@ import UnpublishedRoundedIcon from '@mui/icons-material/UnpublishedRounded';
 import { Link, useNavigate } from 'react-router-dom';
 import AppButton from '@/shared/ui/AppButton';
 import MentorCourseMetricsInline from './MentorCourseMetricsInline';
-import { PRIMARY, TEXT, MUTED } from './mentorCourseCreateStyles';
-import { resolveCourseThumbnailUrl } from '@/features/mentor/utils/mentorCourseImageUtils';
+import { PRIMARY, TEXT, MUTED, DETAIL_ENTITY_TITLE_SX } from './mentorCourseCreateStyles';
+import ThumbnailImage from '@/shared/ui/ThumbnailImage';
 import { isCoursePublished } from '@/features/mentor/utils/mentorCourseUtils';
 import { MENTOR_COURSE_DETAIL_TABS } from '@/features/mentor/utils/mentorCourseDetailUtils';
 import { resolveCategoryChipSx, resolveLevelChipSx } from '@/shared/catalog/catalogRegistry';
@@ -56,36 +56,6 @@ function getStatusChip(isPublished) {
       border: '1px solid rgba(100,116,139,0.18)',
     },
   };
-}
-
-function CourseThumbnail({ thumbnail, courseName }) {
-  const imageUrl = resolveCourseThumbnailUrl(thumbnail);
-
-  return (
-    <Box
-      sx={{
-        width: { xs: '100%', sm: 112 },
-        height: { xs: 140, sm: 72 },
-        borderRadius: '14px',
-        flexShrink: 0,
-        overflow: 'hidden',
-        bgcolor: alpha(PRIMARY, 0.1),
-        backgroundImage: imageUrl ? `url("${imageUrl}")` : 'none',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        display: 'grid',
-        placeItems: 'center',
-      }}
-    >
-      {!imageUrl && (
-        <MenuBookOutlinedIcon sx={{ fontSize: 28, color: PRIMARY }} />
-      )}
-
-      {!imageUrl && courseName && (
-        <Typography sx={{ display: 'none' }}>{courseName}</Typography>
-      )}
-    </Box>
-  );
 }
 
 export default function MentorCourseDetailHeader({
@@ -176,18 +146,23 @@ export default function MentorCourseDetailHeader({
             gap: 2,
           }}
         >
-          <CourseThumbnail thumbnail={course.Thumbnail} courseName={course.CourseName} />
+          <ThumbnailImage
+            src={course.Thumbnail}
+            label={course.CourseName}
+            alt={course.CourseName}
+            cacheKey={course.CourseUpdateAt ?? course.UpdatedAt ?? course.CourseCreateAt}
+            iconSize={28}
+            sx={{
+              width: { xs: '100%', sm: 112 },
+              height: { xs: 140, sm: 72 },
+              borderRadius: '14px',
+              flexShrink: 0,
+            }}
+          />
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 0.75 }}>
-              <Typography
-                sx={{
-                  fontSize: { xs: 20, sm: 22 },
-                  fontWeight: 800,
-                  color: TEXT,
-                  lineHeight: 1.35,
-                }}
-              >
+              <Typography sx={DETAIL_ENTITY_TITLE_SX}>
                 {course.CourseName}
               </Typography>
               <Chip size="small" label={statusChip.label} sx={{ ...PILL_CHIP_SX, ...statusChip.sx }} />
@@ -352,6 +327,7 @@ export default function MentorCourseDetailHeader({
         <Tab value={MENTOR_COURSE_DETAIL_TABS.COURSE} label="Khóa học" />
         <Tab value={MENTOR_COURSE_DETAIL_TABS.CONTENT} label="Nội dung" />
         <Tab value={MENTOR_COURSE_DETAIL_TABS.STUDENTS} label="Học viên" />
+        <Tab value={MENTOR_COURSE_DETAIL_TABS.COMMENTS} label="Bình luận" />
       </Tabs>
     </Box>
   );

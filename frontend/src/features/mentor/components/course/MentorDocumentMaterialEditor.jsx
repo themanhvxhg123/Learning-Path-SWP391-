@@ -15,13 +15,13 @@ import {
   DOC_SOURCE_UPLOAD,
   formatFileSize,
   getDocFileTypeLabel,
-  isAllowedDocFile,
+  getMaterialMaxFileSizeLabel,
+  validateDocFile,
 } from '@/features/mentor/utils/mentorCourseContentUtils';
 
 // TODO: backend should support document upload and SourceType
 
 const PRIMARY = '#0891B2';
-const INVALID_FILE_MESSAGE = 'Chỉ hỗ trợ PDF, DOC, DOCX, PPT, PPTX';
 
 const SOURCE_OPTIONS = [
   { value: DOC_SOURCE_UPLOAD, label: 'Tải file lên', icon: CloudUploadRoundedIcon },
@@ -83,12 +83,15 @@ export default function MentorDocumentMaterialEditor({
 
   const sourceType = material.SourceType === DOC_SOURCE_LINK ? DOC_SOURCE_LINK : DOC_SOURCE_UPLOAD;
   const hasFile = Boolean(material.File);
+  const hasStoredFile = Boolean(material.FileName && material.MaterialUrl);
+  const hasUploadedFile = hasFile || hasStoredFile;
 
   const applyFile = useCallback(
     (file) => {
       if (!file) return;
-      if (!isAllowedDocFile(file)) {
-        setFileTypeError(INVALID_FILE_MESSAGE);
+      const validation = validateDocFile(file);
+      if (!validation.ok) {
+        setFileTypeError(validation.message);
         return;
       }
       setFileTypeError('');
@@ -143,8 +146,8 @@ export default function MentorDocumentMaterialEditor({
   };
 
   const fileError = fileTypeError || errors.File;
-  const displayFileName = material.File?.name ?? '';
-  const displayFileSize = material.File?.size;
+  const displayFileName = material.File?.name ?? material.FileName ?? '';
+  const displayFileSize = material.File?.size ?? material.FileSize;
 
   return (
     <Box
@@ -193,7 +196,7 @@ export default function MentorDocumentMaterialEditor({
 
       {sourceType === DOC_SOURCE_UPLOAD ? (
         <>
-          {!hasFile ? (
+          {!hasUploadedFile ? (
             <Box
               onDragEnter={(event) => {
                 event.preventDefault();
@@ -242,7 +245,7 @@ export default function MentorDocumentMaterialEditor({
                 Kéo thả file vào đây hoặc chọn file
               </Typography>
               <Typography sx={{ fontSize: 12, color: MUTED, textAlign: 'center' }}>
-                Hỗ trợ PDF, DOC, DOCX, PPT, PPTX
+                Hỗ trợ PDF, DOC, DOCX, PPT, PPTX · Tối đa {getMaterialMaxFileSizeLabel()}
               </Typography>
               <AppButton
                 variant="outlined"

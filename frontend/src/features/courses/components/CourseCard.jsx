@@ -16,6 +16,7 @@ import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
 
 // Local Components & Utils
 import AppButton from "@/shared/ui/AppButton";
+import ThumbnailImage from "@/shared/ui/ThumbnailImage";
 import AppProgressBar, { getProgressColor } from "@/shared/ui/AppProgressBar";
 import CourseBookmarkButton from "./CourseBookmarkButton";
 import { buildCourseDetailPath } from "@/features/courses/utils/courseListParams";
@@ -50,7 +51,7 @@ function normalizeCourse(course = {}) {
     checkEnrolled = true; // Đang học dở thì chắc chắn là đã đăng ký
   }
   // 3. Xử lý ảnh Thumbnail bị lỗi
-  let courseImage = course.Thumbnail;
+  let courseImage = course.thumbnail || course.Thumbnail;
   if (courseImage === 'CHƯA FIX LỖI ẢNH') {
     courseImage = null;
   }
@@ -125,49 +126,6 @@ function getMyCoursesStatusChip(progress) {
 }
 
 /* ─── sub-components ─── */
-
-function CourseThumbnail({ thumbnail }) {
-  // console.log(thum)
-  const theme = useTheme();
-  const BASE_IMG_URL = "http://localhost:5000"; // Sau này deploy web chỉ cần đổi link ở đây
-
-// Áp dụng vào CSS
-
-  return (
-    <Box
-      sx={{
-        width: "100%",
-        aspectRatio: "16 / 9",
-        overflow: "hidden",
-        bgcolor: alpha(theme.palette.primary.main, 0.06),
-        backgroundImage: thumbnail ? `url(${BASE_IMG_URL}${thumbnail})` : "none",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      {!thumbnail && (
-        <Box
-          sx={{
-            width: 48,
-            height: 48,
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: alpha(theme.palette.primary.main, 0.1),
-            color: "primary.main",
-          }}
-        >
-          <MenuBookOutlinedIcon sx={{ fontSize: 24 }} />
-        </Box>
-      )}
-    </Box>
-  );
-}
 
 function MetaInline({ icon: Icon, label }) {
   return (
@@ -245,7 +203,13 @@ export default function CourseCard({
       {/* 
       ================= Hình thu nhỏ ==========================================
        */}
-      <CourseThumbnail thumbnail={data.thumbnail} />
+      <ThumbnailImage
+        src={data.thumbnail}
+        label={data.courseName}
+        alt={data.courseName}
+        iconSize={24}
+        sx={{ width: "100%", aspectRatio: "16 / 9", flexShrink: 0 }}
+      />
       {/* {console.log("huhusdfasdfdasf", data.thumbnail)} */}
 
       {/* ── Nội dung thẻ ── */}

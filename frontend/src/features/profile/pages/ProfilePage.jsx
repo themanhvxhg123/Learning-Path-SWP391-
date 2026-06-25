@@ -9,13 +9,27 @@ import {
   Typography,
   alpha,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormGroup,
+  FormControlLabel,
+  Checkbox
 } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import AppButton from "@/shared/ui/AppButton";
+import { toast } from "@/shared/ui/Toast";
 import ChangePasswordDialog from "@/features/auth/components/ChangePasswordDialog";
 import { underlineFieldSx as valueUnderlineSx } from "@/shared/ui/UnderlineFieldPopup";
 import ProfileImageCropDialog from "@/shared/ProfileImageCropDialog";
+import { fetchUserProfile, uploadUserAvatar } from "@/features/profile/services/profileService";
+import {
+  getStoredAvatarUrl,
+  persistUserAvatar,
+} from "@/features/profile/utils/profileAvatarUtils";
 
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
@@ -275,19 +289,16 @@ const getInitialUser = () => {
   }
 };
 
-const getInitialAvatar = () => {
-  try {
-    const explicitAvatar = localStorage.getItem("avatarUrl");
-    if (explicitAvatar) return explicitAvatar;
-    const userObj = getInitialUser();
-    return userObj?.avatarUrl || null;
-  } catch (e) {
-    return null;
-  }
-};
+const getInitialAvatar = () => getStoredAvatarUrl();
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 export default function ProfilePage() {
+  const location = useLocation();
+  const isAdminShell = location.pathname.startsWith('/admin');
+  const breadcrumbHome = isAdminShell
+    ? { to: '/admin/accounts', label: 'Quản trị' }
+    : { to: '/home', label: 'Trang chủ' };
+
   const currentUser = useMemo(() => getInitialUser(), []);
 
   const [profile, setProfile] = useState(INITIAL_PROFILE);
@@ -309,26 +320,31 @@ export default function ProfilePage() {
 
     const fetchProfile = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/users/profile", {
-          headers: {
-            "x-user-id": cUser.userId
-          }
-        });
-        const data = await response.json();
+        const data = await fetchUserProfile();
         const p = data?.profile;
         if (data?.success && p) {
+          if (p.avatarUrl) {
+            const resolvedAvatar = persistUserAvatar(p.avatarUrl);
+            setAvatarUrl(resolvedAvatar);
+          }
+
           setProfile(prev => ({
             ...prev,
-            name: p.name || prev.name,
-            email: p.email || prev.email,
-            phone: p.phone || prev.phone,
-            dateOfBirth: p.dateOfBirth ? p.dateOfBirth.split('T')[0] : prev.dateOfBirth,
-            joinedAt: p.joinedAt ? new Date(p.joinedAt).toLocaleDateString("vi-VN") : prev.joinedAt,
-            stats: {
-              ...prev.stats,
-              learning: p.stats?.learning ?? 0,
-              completed: p.stats?.completed ?? 0,
-            }
+            name: data.profile.name || "",
+            email: data.profile.email || "",
+            phone: data.profile.phone || "",
+            dateOfBirth: data.profile.dateOfBirth?.split("T")[0] || "",
+            currentLevel: data.profile.currentLevel || "",
+            joinedAt: data.profile.joinedAt ? new Date(data.profile.joinedAt).toLocaleDateString("vi-VN", { timeZone: "UTC" }) : "",
+            stats: data.profile.stats || prev.stats,
+
+            rawLearningGoal: data.profile.learningGoal || "",
+            rawCategories: data.profile.categories || [],
+
+            goals: [
+              ...(data.profile.learningGoal ? [`Mục tiêu: ${data.profile.learningGoal}`] : []),
+              ...(data.profile.categories ? data.profile.categories.map(c => c.displayName) : [])
+            ],
           }));
 
           setFormData(prevForm => ({
@@ -408,55 +424,141 @@ export default function ProfilePage() {
   // ==========================================
   const fileInputRef = useRef(null);
   const [tempImageSrc, setTempImageSrc] = useState(null);
+  const handleAvatarClick = () => {
+    setCropperOpen(true);
+  };
+
   /**
-   * Hàm: handleAvatarSelected
-   * Tác dụng: Bắt file từ thẻ input và chuyển thành URL tạm để đưa vào khung cắt
+   * HAm: handleAvatarSelected
+   * TAc dng: B_t file t th input vA chuyn thAnh URL tm ` `a vAo khung c_t
    */
   const handleAvatarSelected = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Vui lòng chọn file ảnh hợp lệ.');
+      return;
+    }
+
     setTempImageSrc(URL.createObjectURL(file));
     setCropperOpen(true);
   };
-  /**
-   * Hàm: handleAvatarUpload
-   * Tác dụng: Nhận ảnh đã cắt (Base64), chuyển thành file và Upload lên Server
-   */
-  const handleAvatarUpload = async (croppedBase64) => {
+
+  const mergeAvatarWithFrame = (faceBase64, frameUrl) => {
+    return new Promise((resolve, reject) => {
+      const FRAME_SIZE = 500;
+      const FACE_SIZE = 380;
+      const FACE_X = (FRAME_SIZE - FACE_SIZE) / 2;
+      const FACE_Y = (FRAME_SIZE - FACE_SIZE) / 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = FRAME_SIZE;
+      canvas.height = FRAME_SIZE;
+      const ctx = canvas.getContext('2d');
+      const faceImg = new Image();
+      faceImg.crossOrigin = 'Anonymous';
+      faceImg.src = faceBase64;
+
+      faceImg.onload = () => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(
+          FACE_X + FACE_SIZE / 2,
+          FACE_Y + FACE_SIZE / 2,
+          FACE_SIZE / 2,
+          0,
+          Math.PI * 2,
+        );
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(faceImg, FACE_X, FACE_Y, FACE_SIZE, FACE_SIZE);
+        ctx.restore();
+
+        const frameImg = new Image();
+        frameImg.crossOrigin = 'Anonymous';
+        frameImg.src = frameUrl;
+        frameImg.onload = () => {
+          ctx.drawImage(frameImg, 0, 0, FRAME_SIZE, FRAME_SIZE);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        frameImg.onerror = () => reject('Lỗi tải Khung');
+      };
+      faceImg.onerror = () => reject('Lỗi tải Mặt');
+    });
+  };
+
+  const handleAvatarUpload = async ({ faceBase64, frameUrl }) => {
+    if (!currentUser?.userId) {
+      toast.error('Vui lòng đăng nhập lại để cập nhật ảnh đại diện.');
+      return;
+    }
+
     try {
-      // 1. Convert base64 sang định dạng Blob chuẩn
-      const res = await fetch(croppedBase64);
+      localStorage.setItem('rawAvatar', faceBase64);
+      localStorage.setItem('rawFrame', frameUrl || '');
+
+      const mergedBase64 = frameUrl ? await mergeAvatarWithFrame(faceBase64, frameUrl) : faceBase64;
+      const res = await fetch(mergedBase64);
       const blob = await res.blob();
+      const data = await uploadUserAvatar(blob);
 
-      // 2. Gói file vào FormData để gửi lên API
-      const formData = new FormData();
-      formData.append("avatar", blob, "avatar.png");
-
-      // 3. Gửi Server
-      const response = await fetch("http://localhost:5000/api/users/avatar", {
-        method: "POST",
-        headers: { "x-user-id": currentUser.userId },
-        body: formData,
-      });
-      const data = await response.json();
-
-      // 4. Nếu thành công -> Đóng popup & Cập nhật UI
-      if (data.success) {
-        const finalUrl = data.avatarUrl.startsWith('http') ? data.avatarUrl : `http://localhost:5000${data.avatarUrl}`;
-        setAvatarUrl(finalUrl);
-        setProfile((prev) => ({ ...prev, avatarUrl: finalUrl }));
-        localStorage.setItem('avatarUrl', finalUrl);
-        window.dispatchEvent(new Event('storage'));
-
-        // Đóng popup và reset biến tạm
-        setCropperOpen(false);
-        setTempImageSrc(null);
+      if (!data.success) {
+        toast.error(data.message ?? 'Không thể cập nhật ảnh đại diện');
+        return;
       }
+
+      const finalUrl = persistUserAvatar(data.avatarUrl);
+      setAvatarUrl(finalUrl);
+      setProfile((prev) => ({ ...prev, avatarUrl: finalUrl }));
+      toast.success('Đã cập nhật ảnh đại diện');
+
+      setCropperOpen(false);
+      if (tempImageSrc?.startsWith('blob:')) {
+        URL.revokeObjectURL(tempImageSrc);
+      }
+      setTempImageSrc(null);
     } catch (err) {
-      console.error("Upload error:", err);
-      alert("Tải ảnh thất bại!");
+      console.error('Upload error:', err);
+      toast.error('Tải ảnh thất bại');
     }
   };
+
+  // ==========================================
+  // STATE: CẬP NHẬT MỤC TIÊU VÀ LĨNH VỰC
+  // ==========================================
+  const [openGoals, setOpenGoals] = useState(false);
+  const [allCats, setAllCats] = useState([]);
+  const [goalInput, setGoalInput] = useState("");
+  const [selectedCats, setSelectedCats] = useState([]);
+  // ==========================================
+  // HÀM: MỞ POPUP VÀ TẢI DANH MỤC TỪ API
+  // Tác dụng: Lấy list categories và gán dữ liệu cũ vào Form
+  // ==========================================
+  const handleOpenPopup = async () => {
+    // Lấy danh sách Categories từ API
+    const res = await fetch("http://localhost:5000/api/categories");
+    const data = await res.json();
+    setAllCats(data.data);
+    // Đổ dữ liệu cũ vào form
+    setGoalInput(profile.rawLearningGoal || "");
+    setSelectedCats(profile.rawCategories ? profile.rawCategories.map(c => c.categoryId) : []);
+    setOpenGoals(true);
+  };
+  // ==========================================
+  // HÀM: LƯU MỤC TIÊU VÀ ĐÓNG POPUP
+  // Tác dụng: Đẩy dữ liệu xuống Backend và tự động F5
+  // ==========================================
+  const saveGoals = async () => {
+    await fetch("http://localhost:5000/api/users/goals", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "x-user-id": currentUser.userId },
+      body: JSON.stringify({ learningGoal: goalInput, categoryIds: selectedCats })
+    });
+    window.location.reload(); // Lưu xong thì tự F5 trang cho mới
+  };
+
+
   return (
     <Box sx={{ maxWidth: 1280, mx: "auto" }}>
       {/* ── Breadcrumb ── */}
@@ -466,7 +568,7 @@ export default function ProfilePage() {
       >
         <MuiLink
           component={Link}
-          to="/home"
+          to={breadcrumbHome.to}
           underline="none"
           sx={{
             fontSize: 13,
@@ -479,7 +581,7 @@ export default function ProfilePage() {
           }}
         >
           <HomeOutlinedIcon sx={{ fontSize: 14 }} />
-          Trang chủ
+          {breadcrumbHome.label}
         </MuiLink>
         <Typography sx={{ fontSize: 13, color: TEXT, fontWeight: 600 }}>
           Hồ sơ cá nhân
@@ -503,13 +605,15 @@ export default function ProfilePage() {
         {/* Avatar */}
         <Tooltip title="Đổi ảnh đại diện" placement="bottom">
           <Box
-            onClick={() => setCropperOpen(true)}
+            onClick={handleAvatarClick}
             sx={{
               position: "relative",
               width: { xs: 72, md: 88 },
               height: { xs: 72, md: 88 },
               flexShrink: 0,
               cursor: "pointer",
+              borderRadius: "50%",
+              overflow: "hidden",
               "&:hover .avatar-cam-overlay": { opacity: 1 },
             }}
           >
@@ -521,7 +625,8 @@ export default function ProfilePage() {
                 sx={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "contain",
+                  objectFit: "cover",
+                  borderRadius: "50%",
                 }}
               />
             ) : (
@@ -695,6 +800,7 @@ export default function ProfilePage() {
                 <AppButton
                   size="small"
                   variant="text"
+                  onClick={handleOpenPopup}
                   sx={{ fontSize: 12, px: 1, minWidth: "auto", height: 28 }}
                 >
                   Cập nhật
@@ -721,6 +827,7 @@ export default function ProfilePage() {
               ))}
               <Chip
                 label="+ Thêm mục tiêu"
+                onClick={handleOpenPopup}
                 size="small"
                 sx={{
                   height: 28,
@@ -733,6 +840,7 @@ export default function ProfilePage() {
                   cursor: "pointer",
                   "&:hover": { borderColor: PRIMARY, color: PRIMARY },
                   transition: "border-color 0.2s, color 0.2s",
+
                 }}
               />
             </Box>
@@ -812,17 +920,70 @@ export default function ProfilePage() {
         ref={fileInputRef}
         onChange={handleAvatarSelected}
       />
-      {/* ── Popup cắt ảnh chuẩn form Mentor ── */}
+      {/* 🚀 Popup cắt ảnh chuẩn form Mentor 🚀 */}
       <ProfileImageCropDialog
         open={cropperOpen}
-        imageSrc={tempImageSrc}
+        imageSrc={tempImageSrc || localStorage.getItem('rawAvatar') || ''}
+        initialFrame={localStorage.getItem('rawFrame') || ''}
         onClose={() => {
           setCropperOpen(false);
+          if (tempImageSrc?.startsWith('blob:')) {
+            URL.revokeObjectURL(tempImageSrc);
+          }
           setTempImageSrc(null);
         }}
         onSave={handleAvatarUpload}
       />
+      <Dialog open={openGoals} onClose={() => setOpenGoals(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontSize: 16, fontWeight: 700, color: TEXT }}>
+          Cập nhật Mục tiêu & Lĩnh vực
+        </DialogTitle>
 
+        <DialogContent dividers>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, mb: 1, color: TEXT }}>
+            Mục tiêu học tập
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Ví dụ: Lấy bằng giỏi, Tìm việc làm..."
+            value={goalInput}
+            onChange={(e) => setGoalInput(e.target.value)}
+            sx={{ mb: 3 }}
+          />
+          <Typography sx={{ fontSize: 14, fontWeight: 600, mb: 1, color: TEXT }}>
+            Lĩnh vực quan tâm
+          </Typography>
+          <FormGroup sx={{ flexDirection: 'row', gap: 1 }}>
+            {allCats.map((cat) => (
+              <FormControlLabel
+                key={cat.categoryId}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={selectedCats.includes(cat.categoryId)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCats([...selectedCats, cat.categoryId]); // Thêm vào mảng
+                      } else {
+                        setSelectedCats(selectedCats.filter(id => id !== cat.categoryId)); // Rút khỏi mảng
+                      }
+                    }}
+                  />
+                }
+                label={<Typography sx={{ fontSize: 14 }}>{cat.displayName}</Typography>}
+                sx={{ width: '45%', m: 0 }}
+              />
+            ))}
+          </FormGroup>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <AppButton variant="outlined" onClick={() => setOpenGoals(false)}>Hủy</AppButton>
+          <AppButton variant="contained" onClick={saveGoals}>Lưu</AppButton>
+        </DialogActions>
+      </Dialog>
     </Box>
+
   );
 }

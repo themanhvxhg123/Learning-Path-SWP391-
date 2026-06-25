@@ -8,14 +8,15 @@ import { ContentFieldLabel } from './MentorContentSectionHeading';
 import { MUTED, TEXT } from './mentorCourseCreateStyles';
 import { formatFileSize } from '@/features/mentor/utils/mentorCourseContentUtils';
 import {
-  AUDIO_ALLOWED_EXTENSIONS,
+  AUDIO_ALLOWED_EXTENSION_NAMES,
+  LISTENING_AUDIO_FILE_ACCEPT,
   LISTENING_SOURCE_LINK,
   LISTENING_SOURCE_UPLOAD,
-  isAllowedAudioFile,
+  getListeningAudioMaxSizeLabel,
+  validateListeningAudioFile,
 } from '@/features/mentor/utils/mentorTestContentUtils';
 
-const INVALID_FILE_MESSAGE = 'Chỉ hỗ trợ file audio: MP3, WAV, M4A, AAC, OGG';
-const FORMAT_HINT = AUDIO_ALLOWED_EXTENSIONS.join(', ').replace(/\./g, '').toUpperCase();
+const FORMAT_HINT = AUDIO_ALLOWED_EXTENSION_NAMES.map((ext) => ext.toUpperCase()).join(', ');
 
 function fieldInputSx(hasError, accentColor) {
   return {
@@ -60,8 +61,9 @@ export default function MentorTestListeningSourceEditor({
   const applyFile = useCallback(
     (file) => {
       if (!file) return;
-      if (!isAllowedAudioFile(file)) {
-        setFileTypeError(INVALID_FILE_MESSAGE);
+      const fileCheck = validateListeningAudioFile(file);
+      if (!fileCheck.ok) {
+        setFileTypeError(fileCheck.message);
         return;
       }
       setFileTypeError('');
@@ -202,12 +204,21 @@ export default function MentorTestListeningSourceEditor({
               </IconButton>
             </Box>
             {previewUrl ? (
-              <Box
-                component="audio"
-                controls
-                src={previewUrl}
-                sx={{ display: 'block', width: '100%', mt: 0.85 }}
-              />
+              /\.mp4$/i.test(displayFileName) ? (
+                <Box
+                  component="video"
+                  controls
+                  src={previewUrl}
+                  sx={{ display: 'block', width: '100%', mt: 0.85 }}
+                />
+              ) : (
+                <Box
+                  component="audio"
+                  controls
+                  src={previewUrl}
+                  sx={{ display: 'block', width: '100%', mt: 0.85 }}
+                />
+              )
             ) : null}
           </>
         ) : (
@@ -236,9 +247,11 @@ export default function MentorTestListeningSourceEditor({
               </Box>
               <Box sx={{ flex: 1, minWidth: 120 }}>
                 <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, lineHeight: 1.35 }}>
-                  Kéo thả hoặc chọn file audio
+                  Kéo thả hoặc chọn file nghe
                 </Typography>
-                <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.1 }}>{FORMAT_HINT}</Typography>
+                <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.1 }}>
+                  {FORMAT_HINT} · Tối đa {getListeningAudioMaxSizeLabel()}
+                </Typography>
               </Box>
               <Box
                 component="button"
@@ -270,7 +283,7 @@ export default function MentorTestListeningSourceEditor({
                 ref={fileInputRef}
                 type="file"
                 hidden
-                accept={AUDIO_ALLOWED_EXTENSIONS.join(',')}
+                accept={LISTENING_AUDIO_FILE_ACCEPT}
                 onChange={handleFileInputChange}
               />
             </Box>

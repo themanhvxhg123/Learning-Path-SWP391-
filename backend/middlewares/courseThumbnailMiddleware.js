@@ -48,19 +48,38 @@ function validateCourseThumbnailDataUrl(dataUrl) {
   return { buffer, ext: parsed.ext };
 }
 
-const saveCourseThumbnailFromDataUrl = (dataUrl, courseId) => {
+function deleteOldCourseAvatars(uploadDir, courseId) {
+  if (!fs.existsSync(uploadDir)) return;
+  const prefix = `course_avt_${courseId}`;
+  for (const file of fs.readdirSync(uploadDir)) {
+    if (file === prefix || file.startsWith(`${prefix}.`) || file.startsWith(`${prefix}_`)) {
+      fs.unlinkSync(path.join(uploadDir, file));
+    }
+  }
+}
+
+const saveCourseThumbnailFromDataUrl = (dataUrl, courseId, options = {}) => {
+  const { replaceExisting = false } = options;
   const validated = validateCourseThumbnailDataUrl(dataUrl);
   if (!validated) return null;
-  if (validated.existingPath) return validated.existingPath;
+  if (validated.existingPath && !replaceExisting) {
+    return validated.existingPath;
+  }
 
   const { buffer, ext } = validated;
-  const fileName = `course_avt_${courseId}.${ext}`;
-
   const uploadDir = path.join(__dirname, '../public/assets/avatars/courses');
 
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
+
+  if (replaceExisting) {
+    deleteOldCourseAvatars(uploadDir, courseId);
+  }
+
+  const fileName = replaceExisting
+    ? `course_avt_${courseId}_${Date.now()}.${ext}`
+    : `course_avt_${courseId}.${ext}`;
 
   const filePath = path.join(uploadDir, fileName);
   fs.writeFileSync(filePath, buffer);

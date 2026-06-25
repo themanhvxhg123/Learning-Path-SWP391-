@@ -39,13 +39,13 @@ import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import AppButton from "@/shared/ui/AppButton";
+import ThumbnailImage from "@/shared/ui/ThumbnailImage";
 import AppProgressBar, { getProgressColor } from "@/shared/ui/AppProgressBar";
 import CourseCard from "@/features/courses/components/CourseCard";
 import CourseBookmarkButton from "@/features/courses/components/CourseBookmarkButton";
 import useSavedCourses from "@/features/courses/hooks/useSavedCourses";
 import { buildCourseDetailPath, buildCourseListPath } from "@/features/courses/utils/courseListParams";
 import { getExtraCourseDetail } from "@/features/courses/data/courseDetailMock";
-import { resolveCategoryChipSx, resolveLevelChipSx } from "@/shared/catalog/catalogRegistry";
 import { enrollCourseApi } from '@/features/auth/services/authService';
 import { toast } from "@/shared/ui/Toast";
 
@@ -58,7 +58,7 @@ const BORDER = "rgba(8,145,178,0.09)";
 const DIVIDER = "rgba(8,145,178,0.10)";
 const STICKY_TOP = 76;
 
-const RELATED_COURSES = [];
+
 
 /* ─── Helpers (Giữ nguyên 100%) ─── */
 
@@ -67,6 +67,25 @@ function getStatusChip(isEnrolled, progress) {
   if (progress >= 100) return { label: "Hoàn thành", sx: { bgcolor: "rgba(4,120,87,0.12)", color: "#047857", border: "1px solid rgba(4,120,87,0.24)" } };
   if (progress > 0) return { label: "Đang học", sx: { bgcolor: "rgba(8,145,178,0.12)", color: PRIMARY, border: "1px solid rgba(8,145,178,0.20)" } };
   return { label: "Đã đăng ký", sx: { bgcolor: "rgba(22,163,74,0.12)", color: "#16A34A", border: "1px solid rgba(22,163,74,0.20)" } };
+}
+
+function getLevelChipSx(level = "") {
+  const l = level.toLowerCase();
+  if (l.includes("cơ bản")) return { bgcolor: "rgba(56,189,248,0.12)", color: "#0284C7", border: "1px solid rgba(56,189,248,0.22)" };
+  if (l.includes("trung cấp")) return { bgcolor: "rgba(245,158,11,0.12)", color: "#D97706", border: "1px solid rgba(245,158,11,0.22)" };
+  if (l.includes("nâng cao")) return { bgcolor: "rgba(234,88,12,0.12)", color: ACCENT, border: "1px solid rgba(234,88,12,0.22)" };
+  return { bgcolor: "#F1F5F9", color: MUTED };
+}
+
+function getCategoryChipSx(category = "") {
+  const map = {
+    "Giao tiếp": { bgcolor: "rgba(37,99,235,0.10)", color: "#2563EB" },
+    IELTS: { bgcolor: "rgba(124,58,237,0.10)", color: "#7C3AED" },
+    TOEIC: { bgcolor: "rgba(14,116,144,0.10)", color: PRIMARY_DARK },
+    "Ngữ pháp": { bgcolor: "rgba(15,23,42,0.08)", color: "#334155" },
+    "Phát âm": { bgcolor: "rgba(236,72,153,0.10)", color: "#DB2777" },
+  };
+  return map[category] ?? { bgcolor: "#F1F5F9", color: MUTED };
 }
 
 function formatStudentCount(count) {
@@ -142,8 +161,8 @@ function CourseIntro({ course, isEnrolled }) {
         <Typography sx={{ fontSize: 13, color: TEXT, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{course.title}</Typography>
       </Breadcrumbs>
 
-      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1.5, mb: 1.25 }}>
-        <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 700, color: TEXT, lineHeight: 1.25, fontSize: { xs: 24, sm: 28, md: 32 }, letterSpacing: "-0.02em" }}>
+      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: 1.25 }}>
+        <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 700, color: TEXT, lineHeight: 1.3, fontSize: { xs: 20, sm: 22, md: 24 }, letterSpacing: "0.01em" }}>
           {course.title}
         </Typography>
         <CourseBookmarkButton isSaved={isSaved(courseId)} onToggle={() => toggleSave(courseId)} size="medium" iconSize={26} />
@@ -165,12 +184,8 @@ function CourseIntro({ course, isEnrolled }) {
 
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 2.5 }}>
         <Chip label={statusChip.label} size="small" sx={{ height: 24, fontSize: 12, fontWeight: 600, borderRadius: "99px", ...statusChip.sx }} />
-        {course.level && (
-          <Chip label={course.level} size="small" sx={{ height: 24, fontSize: 12, fontWeight: 600, borderRadius: "99px", ...resolveLevelChipSx({ displayName: course.level }) }} />
-        )}
-        {course.category && (
-          <Chip label={course.category} size="small" sx={{ height: 24, fontSize: 12, fontWeight: 600, borderRadius: "99px", ...resolveCategoryChipSx({ displayName: course.category }, { withBorder: false }) }} />
-        )}
+        {course.level && <Chip label={course.level} size="small" sx={{ height: 24, fontSize: 12, fontWeight: 600, borderRadius: "99px", ...getLevelChipSx(course.level) }} />}
+        {course.category && <Chip label={course.category} size="small" sx={{ height: 24, fontSize: 12, fontWeight: 600, borderRadius: "99px", ...getCategoryChipSx(course.category) }} />}
       </Box>
 
       <CourseMetaRow course={course} />
@@ -205,13 +220,13 @@ function CourseStickyCTA({ course, isEnrolled, onEnroll, onContinue, sticky = tr
   return (
     <Box sx={{ position: sticky ? { md: "sticky" } : "static", top: sticky ? { md: STICKY_TOP } : "auto", width: "100%", flexShrink: 0 }}>
       <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: "20px", boxShadow: "0 8px 32px rgba(8,145,178,0.10)", overflow: "hidden" }}>
-        <Box sx={{ aspectRatio: "16 / 9", bgcolor: alpha(PRIMARY, 0.06), backgroundImage: course.thumbnail ? `url(http://localhost:5000${course.thumbnail})` : "none", backgroundSize: "cover", backgroundPosition: "center", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {!course.thumbnail && (
-            <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: alpha(PRIMARY, 0.1), display: "flex", alignItems: "center", justifyContent: "center", color: PRIMARY }}>
-              <MenuBookOutlinedIcon sx={{ fontSize: 32 }} />
-            </Box>
-          )}
-        </Box>
+        <ThumbnailImage
+          src={course.thumbnail}
+          label={course.title}
+          alt={course.title}
+          iconSize={32}
+          sx={{ aspectRatio: "16 / 9", width: "100%" }}
+        />
 
         <Box sx={{ p: 2.5 }}>
           <Typography sx={{ fontSize: 22, fontWeight: 800, color: TEXT, mb: 2, letterSpacing: "-0.02em" }}>
@@ -269,7 +284,7 @@ function OutcomesSection({ outcomes }) {
 
 function LessonIcon({ type }) {
   const Icon = type === "video" ? PlayCircleOutlineOutlinedIcon : ArticleRoundedIcon;
-  return <Icon sx={{ fontSize: 16, color: MUTED, flexShrink: 0 }} />;
+  return <Icon sx={{ fontSize: 15, color: MUTED, flexShrink: 0 }} />;
 }
 
 function CurriculumSection({ modules, isEnrolled, course }) {
@@ -293,39 +308,44 @@ function CurriculumSection({ modules, isEnrolled, course }) {
 
   return (
     <Box>
-      <Box sx={{ pb: 2, mb: 0.5, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, borderBottom: `1px solid ${DIVIDER}` }}>
+      <Box sx={{ pb: 1.75, mb: 0.5, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, borderBottom: `1px solid ${DIVIDER}` }}>
         <Box>
-          <SectionTitle sx={{ mb: 0.75 }}>Nội dung khóa học</SectionTitle>
+          <SectionTitle sx={{ mb: 0.5, fontSize: { xs: 16, sm: 17 } }}>Nội dung khóa học</SectionTitle>
           <Typography sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}>
             {course.stageCount} chương • {course.lessonCount} bài • {course.duration}
           </Typography>
         </Box>
-        <IconButton onClick={toggleAll} sx={{ flexShrink: 0, mt: 0.25, color: MUTED, p: 0.5, "&:hover": { bgcolor: "transparent", color: MUTED } }}>
-          {allExpanded ? <CloseFullscreenRoundedIcon sx={{ fontSize: 19 }} /> : <OpenInFullRoundedIcon sx={{ fontSize: 19 }} />}
+        <IconButton onClick={toggleAll} sx={{ flexShrink: 0, mt: 0.15, color: MUTED, p: 0.5, "&:hover": { bgcolor: "transparent", color: MUTED } }}>
+          {allExpanded ? <CloseFullscreenRoundedIcon sx={{ fontSize: 18 }} /> : <OpenInFullRoundedIcon sx={{ fontSize: 18 }} />}
         </IconButton>
       </Box>
 
       {modules.map((mod, index) => (
         <Accordion key={mod.id} expanded={expandedIds.has(mod.id)} onChange={toggleModule(mod.id)} disableGutters elevation={0} sx={{ bgcolor: "transparent", "&:before": { display: "none" }, borderBottom: `1px solid ${DIVIDER}`, "&:last-of-type": { borderBottom: "none" } }}>
-          <AccordionSummary expandIcon={<ExpandMoreRoundedIcon sx={{ color: MUTED, fontSize: 22 }} />} sx={{ px: 0, py: 0, minHeight: "unset", bgcolor: "transparent", transition: "background-color 0.15s ease", "&:hover": { bgcolor: alpha(PRIMARY, 0.03) }, "& .MuiAccordionSummary-content": { my: 2.5, alignItems: "center", gap: 1.5 } }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 700, color: MUTED, minWidth: 28, flexShrink: 0 }}>{String(index + 1).padStart(2, "0")}</Typography>
+          <AccordionSummary expandIcon={<ExpandMoreRoundedIcon sx={{ color: MUTED, fontSize: 20 }} />} sx={{ px: 0, py: 0, minHeight: "unset", bgcolor: "transparent", transition: "background-color 0.15s ease", "&:hover": { bgcolor: alpha(PRIMARY, 0.03) }, "& .MuiAccordionSummary-content": { my: 2, alignItems: "center", gap: 1.25 } }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: MUTED, minWidth: 24, flexShrink: 0 }}>{String(index + 1).padStart(2, "0")}</Typography>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: 15, color: TEXT, lineHeight: 1.35 }}>{mod.title}</Typography>
-              <Typography sx={{ fontSize: 12.5, color: MUTED, mt: 0.35 }}>{mod.lessonCount} bài học</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: 14, color: TEXT, lineHeight: 1.35 }}>{mod.title}</Typography>
+              <Typography sx={{ fontSize: 12, color: MUTED, mt: 0.25 }}>{mod.lessonCount} bài học</Typography>
             </Box>
           </AccordionSummary>
 
-          <AccordionDetails sx={{ p: 0, pb: 1.5 }}>
+          <AccordionDetails sx={{ p: 0, pb: 1.25 }}>
+            {mod.description && (
+              <Box sx={{ pl: 4, pr: 0, pt: 0, pb: 1.5, borderBottom: mod.lessons.length > 0 ? `1px solid ${alpha(DIVIDER, 0.85)}` : "none" }}>
+                <Typography sx={{ fontSize: 12.5, color: MUTED, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{mod.description}</Typography>
+              </Box>
+            )}
             {mod.lessons.map((lesson, lessonIndex) => {
               const isLocked = !isEnrolled && !lesson.isPreview;
               return (
-                <Box key={lesson.id} sx={{ display: "flex", alignItems: "center", gap: 1.25, pl: 4.5, pr: 0, py: 1.5, borderTop: lessonIndex > 0 ? `1px solid ${alpha(DIVIDER, 0.85)}` : "none", opacity: isLocked ? 0.5 : 1, transition: "background-color 0.15s ease", "&:hover": { bgcolor: isLocked ? "transparent" : alpha(PRIMARY, 0.03) } }}>
-                  {isLocked ? <LockOutlinedIcon sx={{ fontSize: 16, color: MUTED, flexShrink: 0 }} /> : <LessonIcon type={lesson.type} />}
-                  <Typography sx={{ flex: 1, fontSize: 13.5, color: isLocked ? MUTED : TEXT, fontWeight: lesson.isCompleted ? 600 : 400, lineHeight: 1.4 }}>{lesson.title}</Typography>
+                <Box key={lesson.id} sx={{ display: "flex", alignItems: "center", gap: 1, pl: 4, pr: 0, py: 1.25, borderTop: lessonIndex > 0 ? `1px solid ${alpha(DIVIDER, 0.85)}` : "none", opacity: isLocked ? 0.5 : 1, transition: "background-color 0.15s ease", "&:hover": { bgcolor: isLocked ? "transparent" : alpha(PRIMARY, 0.03) } }}>
+                  {isLocked ? <LockOutlinedIcon sx={{ fontSize: 15, color: MUTED, flexShrink: 0 }} /> : <LessonIcon type={lesson.type} />}
+                  <Typography sx={{ flex: 1, fontSize: 13, color: isLocked ? MUTED : TEXT, fontWeight: lesson.isCompleted ? 600 : 400, lineHeight: 1.4 }}>{lesson.title}</Typography>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexShrink: 0 }}>
-                    {lesson.isPreview && !isEnrolled && <Chip label="Xem thử" size="small" sx={{ height: 20, fontSize: 10.5, fontWeight: 700, borderRadius: "99px", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }} />}
-                    {lesson.isCompleted && <CheckCircleOutlineOutlinedIcon sx={{ fontSize: 15, color: "#047857" }} />}
-                    {lesson.duration && <Typography sx={{ fontSize: 12, color: MUTED, minWidth: 52, textAlign: "right" }}>{lesson.duration}</Typography>}
+                    {lesson.isPreview && !isEnrolled && <Chip label="Xem thử" size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, borderRadius: "99px", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }} />}
+                    {lesson.isCompleted && <CheckCircleOutlineOutlinedIcon sx={{ fontSize: 14, color: "#047857" }} />}
+                    {lesson.duration && <Typography sx={{ fontSize: 11.5, color: MUTED, minWidth: 48, textAlign: "right" }}>{lesson.duration}</Typography>}
                   </Box>
                 </Box>
               );
@@ -337,16 +357,75 @@ function CurriculumSection({ modules, isEnrolled, course }) {
   );
 }
 
-function RelatedCoursesSection() {
+function RelatedCoursesSection({ course }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [relatedCourses, setRelatedCourses] = useState([]);
+
+  useEffect(() => {
+    // Phải có thông tin khóa học hiện tại mới đi tìm các khóa liên quan
+    if (!course?.categoryId || !course?.levelId) return;
+
+    const fetchRelated = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const headers = user.userId ? { 'x-user-id': user.userId } : {};
+
+        // Lấy tất cả khóa học
+        const res = await fetch('http://localhost:5000/api/courses/student', { headers });
+        const data = await res.json();
+
+        if (data.success) {
+          // 0. Loại bỏ chính khóa học mà user đang xem ra khỏi danh sách
+          const allCourses = data.data.filter(c => String(c.CourseId) !== String(course.id));
+
+          // 1. Lọc khóa học khớp CẢ danh mục VÀ trình độ
+          let exactMatch = allCourses.filter(c =>
+            String(c.CategoryId) === String(course.categoryId) &&
+            String(c.LevelId) === String(course.levelId)
+          );
+
+          // 2. Lọc khóa học khớp 1 TRONG 2 (nhưng không lấy trùng với mảng ở bước 1)
+          let partialMatch = allCourses.filter(c =>
+            (String(c.CategoryId) === String(course.categoryId) || String(c.LevelId) === String(course.levelId)) &&
+            !exactMatch.some(e => String(e.CourseId) === String(c.CourseId))
+          );
+
+          // 3. Gộp lại và CHỈ LẤY TỐI ĐA 5 khóa học
+          let finalRelated = [...exactMatch, ...partialMatch].slice(0, 5);
+          setRelatedCourses(finalRelated);
+        }
+      } catch (error) {
+        console.error("Lỗi lấy khóa học liên quan:", error);
+      }
+    };
+
+    fetchRelated();
+  }, [course]);
+
+  // Nếu không tìm thấy khóa nào thì ẩn luôn khu vực này cho đẹp
+  if (relatedCourses.length === 0) return null;
+
   return (
     <Box>
-      <SectionTitle sx={{ mb: 2 }}>Khóa học liên quan</SectionTitle>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <SectionTitle>Khóa học liên quan</SectionTitle>
+        <AppButton
+          variant="text"
+          sx={{ fontWeight: 600, color: PRIMARY }}
+          onClick={() => navigate(`/courses?category=${course.categoryId}&level=${course.levelId}`)}
+        >
+          Xem thêm
+        </AppButton>
+      </Box>
       <Grid container spacing={2.5}>
-        {RELATED_COURSES.map((c) => (
-          <Grid item xs={12} sm={6} md={4} key={c.courseId}>
-            <CourseCard course={c} onEnroll={() => navigate(buildCourseDetailPath(c.courseId, searchParams))} onContinueLearning={() => navigate(buildCourseDetailPath(c.courseId, searchParams))} />
+        {relatedCourses.map((c) => (
+          <Grid item xs={12} sm={6} md={4} key={c.CourseId}>
+            <CourseCard
+              course={c}
+              onEnroll={() => navigate(buildCourseDetailPath(c.CourseId, searchParams))}
+              onContinueLearning={() => navigate(buildCourseDetailPath(c.CourseId, searchParams))}
+            />
           </Grid>
         ))}
       </Grid>
@@ -363,22 +442,31 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 2. Tự động gọi API lấy data từ Database khi mở trang
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         const headers = user.userId ? { 'x-user-id': user.userId } : {};
-        // Vẫn dùng API cho Detail
+        // Vẫn dùng API cũ vì Backend của bạn chỉ có API này cho Detail
         const res = await fetch(`http://localhost:5000/api/courses/my-courses/${id}?tab=course`, { headers });
         const result = await res.json();
         // Kiểm tra xem có dữ liệu không
         if (result.success && result.data && result.data.length > 0) {
           const dbData = result.data[0];
-          // 1. Xử lý ảnh lỗi (quét cả biến thumbnail viết thường lẫn hoa)
-          let courseImage = dbData.Thumbnail;
-          if (courseImage === 'CHƯA FIX LỖI ẢNH') {
+          // 1. Xử lý ảnh lỗi và tạo URL tuyệt đối
+          let courseImage = dbData.thumbnail || dbData.Thumbnail;
+          if (courseImage === 'CHƯA FIX LỖI ẢNH' || !courseImage) {
             courseImage = null;
+          } else {
+            let val = String(courseImage).trim();
+            if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:image') || val.startsWith('blob:')) {
+              courseImage = val;
+            } else {
+              courseImage = `http://localhost:5000${val.startsWith('/') ? val : '/' + val}`;
+            }
           }
+          // Gán dữ liệu (Hỗ trợ đọc 2 kiểu: cả HOA lẫn thường từ DB)
           const mappedCourse = {
             id: dbData.CourseId,
             title: dbData.CourseName,
@@ -386,7 +474,9 @@ export default function CourseDetailPage() {
             shortDescription: dbData.Description,
             thumbnail: courseImage,
             category: dbData.CategoryDisplayName,
+            categoryId: dbData.CategoryId,
             level: dbData.LevelDisplayName,
+            levelId: dbData.LevelId,
             instructor: dbData.InStructorName,
             isEnrolled: Boolean(dbData.isEnrolled),
             progress: dbData.progress,
@@ -499,7 +589,7 @@ export default function CourseDetailPage() {
       </Box>
 
       <Box sx={{ mt: { xs: 4, sm: 5 } }}>
-        <RelatedCoursesSection />
+        <RelatedCoursesSection course={course} />
       </Box>
     </Box>
   );

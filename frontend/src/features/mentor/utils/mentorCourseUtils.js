@@ -2,6 +2,15 @@
  * Normalize raw course records from API (PascalCase) or mock (camelCase).
  */
 import { countMaterialsInPath } from './mentorCourseContentUtils';
+
+function pickNonEmpty(...values) {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
 export function normalizeMentorCourse(raw = {}) {
   const isPublished = raw.isPublished ?? raw.IsPublished;
   let status = raw.status;
@@ -9,27 +18,75 @@ export function normalizeMentorCourse(raw = {}) {
     status = isPublished === true || isPublished === 1 ? 'published' : 'draft';
   }
 
+  const courseId = raw.courseId ?? raw.CourseId;
+  const courseName = pickNonEmpty(raw.courseName, raw.CourseName);
+  const description = pickNonEmpty(raw.description, raw.Description);
+  const thumbnail = raw.thumbnail ?? raw.Thumbnail ?? null;
+  const categoryId = raw.categoryId ?? raw.CategoryId ?? null;
+  const categoryName = pickNonEmpty(
+    raw.categoryName,
+    raw.CategoryName,
+    raw.CategoryDisplayName,
+    raw.category,
+  );
+  const categoryDisplayName = pickNonEmpty(
+    raw.CategoryDisplayName,
+    raw.categoryName,
+    raw.CategoryName,
+    raw.category,
+  );
+  const levelId = raw.levelId ?? raw.LevelId ?? null;
+  const levelName = pickNonEmpty(raw.levelName, raw.LevelName, raw.LevelDisplayName, raw.level);
+  const levelDisplayName = pickNonEmpty(
+    raw.LevelDisplayName,
+    raw.levelName,
+    raw.LevelName,
+    raw.level,
+  );
+
   return {
-    courseId: raw.courseId ?? raw.CourseId,
-    courseName: raw.courseName ?? raw.CourseName ?? '',
-    description: raw.description ?? raw.Description ?? '',
-    thumbnail: raw.thumbnail ?? raw.Thumbnail ?? null,
-    categoryId: raw.categoryId ?? raw.CategoryId ?? null,
-    categoryName: raw.categoryName ?? raw.category ?? raw.CategoryName ?? raw.CategoryDisplayName ?? '',
-    levelId: raw.levelId ?? raw.LevelId ?? null,
-    levelName: raw.levelName ?? raw.level ?? raw.LevelName ?? raw.LevelDisplayName ?? '',
+    courseId,
+    CourseId: courseId,
+    courseName,
+    CourseName: courseName,
+    description,
+    Description: description,
+    thumbnail,
+    Thumbnail: thumbnail,
+    categoryId,
+    CategoryId: categoryId,
+    categoryName,
+    CategoryName: categoryName,
+    categoryDisplayName,
+    CategoryDisplayName: categoryDisplayName,
+    levelId,
+    LevelId: levelId,
+    levelName,
+    LevelName: levelName,
+    levelDisplayName,
+    LevelDisplayName: levelDisplayName,
     instructorId: raw.instructorId ?? raw.InstructorId ?? null,
-    instructorName: raw.instructorName ?? raw.instructor ?? raw.InstructorName ?? '',
+    InstructorId: raw.instructorId ?? raw.InstructorId ?? null,
+    instructorName: pickNonEmpty(raw.instructorName, raw.InstructorName, raw.instructor),
+    InstructorName: pickNonEmpty(raw.instructorName, raw.InstructorName, raw.instructor),
     rating: raw.rating ?? raw.Rating ?? null,
+    Rating: raw.rating ?? raw.Rating ?? null,
     totalLessons: raw.totalLessons ?? raw.TotalLessons ?? 0,
+    TotalLessons: raw.totalLessons ?? raw.TotalLessons ?? 0,
     totalNodes: raw.totalNodes ?? raw.TotalNodes ?? 0,
     totalMaterials: raw.totalMaterials ?? raw.TotalMaterials ?? 0,
-    studentCount: raw.studentCount ?? raw.StudentCount ?? 0,
+    TotalMaterials: raw.totalMaterials ?? raw.TotalMaterials ?? 0,
+    studentCount: Number(raw.studentCount ?? raw.StudentCount ?? 0) || 0,
+    StudentCount: Number(raw.studentCount ?? raw.StudentCount ?? 0) || 0,
     status,
     isPublished: isPublished === true || isPublished === 1,
+    IsPublished: isPublished === true || isPublished === 1,
     createdAt: raw.createdAt ?? raw.CreatedAt ?? null,
+    CreatedAt: raw.createdAt ?? raw.CreatedAt ?? null,
     updatedAt: raw.updatedAt ?? raw.UpdatedAt ?? raw.createdAt ?? raw.CreatedAt ?? null,
+    UpdatedAt: raw.updatedAt ?? raw.UpdatedAt ?? raw.createdAt ?? raw.CreatedAt ?? null,
     paths: raw.paths ?? raw.Paths ?? [],
+    Paths: raw.paths ?? raw.Paths ?? [],
   };
 }
 

@@ -1,128 +1,60 @@
-import { adminCategoriesSeed } from '@/features/admin/data/adminCategoriesMock';
-import { normalizeCategory } from '@/features/admin/utils/adminCategoryUtils';
-import { pickNextColorCode } from '@/shared/catalog/catalogColorPalette';
+/**
+ * Admin Category Service — calls real backend APIs.
+ */
+import { apiGet, apiPost, apiPut, apiDelete } from '@/features/admin/services/adminApiClient';
+import { resolveSeedColorCode } from '@/shared/catalog/catalogColorPalette';
 
-const STORAGE_KEY = 'admin_categories_v1';
-
-function loadStored() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeCategory) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveStored(items) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  } catch {
-    // ignore
-  }
-}
-
-function getAll() {
-  const stored = loadStored();
-  if (stored) return stored;
-  return adminCategoriesSeed.map(normalizeCategory);
-}
-
-function nextId(items) {
-  return items.reduce((max, item) => (item.id > max ? item.id : max), 0) + 1;
-}
-
-function normalizeDisplayName(value = '') {
-  return String(value).trim().toLowerCase();
-}
-
-function slugifyDisplayName(value = '') {
-  return (
-    String(value)
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || `category-${Date.now()}`
-  );
-}
-
-function uniqueCategorySlug(items, displayName, excludeId = null) {
-  let base = slugifyDisplayName(displayName);
-  let slug = base;
-  let counter = 2;
-  while (
-    items.some(
-      (item) =>
-        item.categoryName === slug &&
-        (excludeId == null || String(item.id) !== String(excludeId)),
-    )
-  ) {
-    slug = `${base}-${counter}`;
-    counter += 1;
-  }
-  return slug;
-}
-
-function simulateDelay(ms = 180) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Map a backend category record to the frontend shape.
+ * Backend returns: CategoryId, CategoryName, DisplayName, CreatedAt
+ */
+function mapCategory(raw) {
+  return {
+    id: raw.CategoryId,
+    categoryName: raw.CategoryName || '',
+    displayName: raw.DisplayName || '',
+    colorCode: raw.ColorCode || resolveSeedColorCode('category', raw.CategoryId) || null,
+    status: raw.Status || 'ACTIVE',
+    createdAt: raw.CreatedAt || null,
+  };
 }
 
 export async function getCategories() {
-  await simulateDelay();
-  return { ok: true, categories: getAll() };
+  const res = await apiGet('/categories');
+  if (!res.ok) return { ok: false, categories: [] };
+  const categories = (res.data || []).map(mapCategory);
+  return { ok: true, categories };
 }
 
 export async function createCategory(payload) {
-  await simulateDelay();
-  const items = getAll();
-  const displayName = String(payload.displayName ?? '').trim();
-
-  if (items.some((item) => normalizeDisplayName(item.displayName) === normalizeDisplayName(displayName))) {
-    return { ok: false, message: 'Tên danh mục đã tồn tại' };
-  }
-
-  const created = normalizeCategory({
-    id: nextId(items),
-    categoryName: uniqueCategorySlug(items, displayName),
-    displayName,
-    colorCode: pickNextColorCode(items),
-    status: payload.status ?? 'ACTIVE',
-    createdAt: new Date().toISOString(),
+  const res = await apiPost('/categories', {
+    CategoryName: payload.categoryName || payload.displayName?.toLowerCase().replace(/\s+/g, '-') || '',
+    DisplayName: payload.displayName,
   });
-
-  saveStored([...items, created]);
-  return { ok: true, category: created };
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể tạo danh mục' };
+  }
+  return { ok: true, category: mapCategory(res.data) };
 }
 
 export async function updateCategory(id, payload) {
-  await simulateDelay();
-  const items = getAll();
-  const index = items.findIndex((item) => String(item.id) === String(id));
-  if (index < 0) return { ok: false, message: 'Không tìm thấy danh mục' };
-
-  const displayName = String(payload.displayName ?? items[index].displayName).trim();
-  if (
-    items.some(
-      (item, i) =>
-        i !== index && normalizeDisplayName(item.displayName) === normalizeDisplayName(displayName),
-    )
-  ) {
-    return { ok: false, message: 'Tên danh mục đã tồn tại' };
-  }
-
-  const updated = normalizeCategory({
-    ...items[index],
-    displayName,
-    categoryName: uniqueCategorySlug(items, displayName, id),
-    colorCode: items[index].colorCode ?? pickNextColorCode(items),
-    status: payload.status ?? items[index].status,
+  const res = await apiPut(`/categories/${id}`, {
+    CategoryName: payload.categoryName || payload.displayName?.toLowerCase().replace(/\s+/g, '-') || '',
+    DisplayName: payload.displayName,
   });
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể cập nhật danh mục' };
+  }
+  // Re-fetch to get updated data
+  const fetchRes = await getCategories();
+  const updated = (fetchRes.categories || []).find((c) => String(c.id) === String(id));
+  return { ok: true, category: updated || null };
+}
 
-  const next = [...items];
-  next[index] = updated;
-  saveStored(next);
-  return { ok: true, category: updated };
+export async function deleteCategory(id) {
+  const res = await apiDelete(`/categories/${id}`);
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể xoá danh mục' };
+  }
+  return { ok: true, message: 'Đã xoá danh mục thành công' };
 }

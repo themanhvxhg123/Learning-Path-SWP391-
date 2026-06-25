@@ -13,9 +13,8 @@ import {
   ADMIN_ACCOUNT_ROLE_LABELS,
   ADMIN_ACCOUNT_STATUS_CHIP_SX,
   ADMIN_ACCOUNT_STATUS_LABELS,
-  ADMIN_ACCOUNT_TABLE_GRID_COLUMNS,
+  ADMIN_ACCOUNT_TABLE_LAYOUT_SX,
   formatAccountDate,
-  formatAccountDateTime,
   getAccountInitials,
 } from '@/features/admin/utils/adminAccountUtils';
 import { PRIMARY, TEXT, MUTED } from '@/features/mentor/components/course/mentorCourseCreateStyles';
@@ -61,16 +60,19 @@ export default function AdminAccountRow({ account, onEdit }) {
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: { xs: '1fr', md: ADMIN_ACCOUNT_TABLE_GRID_COLUMNS },
-        alignItems: { xs: 'stretch', md: 'center' },
-        gap: { xs: 1.25, md: 2 },
-        px: { xs: 2, sm: 2.25 },
+        gridTemplateColumns: { xs: '1fr', md: ADMIN_ACCOUNT_TABLE_LAYOUT_SX.gridTemplateColumns },
+        columnGap: { xs: 0, md: ADMIN_ACCOUNT_TABLE_LAYOUT_SX.columnGap },
+        px: { xs: 2, md: ADMIN_ACCOUNT_TABLE_LAYOUT_SX.px },
+        alignItems: { xs: 'stretch', md: ADMIN_ACCOUNT_TABLE_LAYOUT_SX.alignItems },
+        width: '100%',
+        boxSizing: 'border-box',
+        rowGap: { xs: 1.25, md: 0 },
         py: { xs: 2, md: 1.75 },
         borderBottom: '1px solid rgba(15,23,42,0.06)',
         '&:last-child': { borderBottom: 'none' },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0, justifySelf: 'start' }}>
         <Avatar
           sx={{
             width: 40,
@@ -104,12 +106,12 @@ export default function AdminAccountRow({ account, onEdit }) {
         </Box>
       </Box>
 
-      <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ minWidth: 0, justifySelf: 'start' }}>
         <MobileField label="Email" value={account.email} />
         <DesktopValue value={account.email} />
       </Box>
 
-      <Box>
+      <Box sx={{ justifySelf: 'start' }}>
         <MobileField
           label="Vai trò"
           value={ADMIN_ACCOUNT_ROLE_LABELS[account.role] ?? account.role}
@@ -125,7 +127,7 @@ export default function AdminAccountRow({ account, onEdit }) {
         />
       </Box>
 
-      <Box>
+      <Box sx={{ justifySelf: 'start' }}>
         <MobileField
           label="Trạng thái"
           value={ADMIN_ACCOUNT_STATUS_LABELS[account.status] ?? account.status}
@@ -141,20 +143,12 @@ export default function AdminAccountRow({ account, onEdit }) {
         />
       </Box>
 
-      <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ minWidth: 0, justifySelf: 'start' }}>
         <MobileField label="Ngày tạo" value={formatAccountDate(account.createdAt)} />
         <DesktopValue value={formatAccountDate(account.createdAt)} />
       </Box>
 
-      <Box sx={{ minWidth: 0 }}>
-        <MobileField
-          label="Lần đăng nhập gần nhất"
-          value={formatAccountDateTime(account.lastLoginAt)}
-        />
-        <DesktopValue value={formatAccountDateTime(account.lastLoginAt)} />
-      </Box>
-
-      <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+      <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, justifySelf: 'end' }}>
         <Tooltip title="Chỉnh sửa vai trò & trạng thái">
           <IconButton
             size="small"

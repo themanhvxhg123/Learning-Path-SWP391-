@@ -8,9 +8,9 @@
  */
 
 import { mentorCoursesMock } from '@/features/mentor/data/mentorCoursesMock';
-import { mentorCourseDetailById } from '@/features/mentor/data/mentorCourseDetailMock';
-import { mentorQuestionBankMock } from '@/features/mentor/data/mentorQuestionBankMock';
 import { mentorQuestionBankSeed } from '@/features/mentor/data/mentorQuestionBankSeed';
+import { getUser } from '@/features/auth/utils/authUtils';
+import { fetchMentorCourses } from '../services/mentorCourseService';
 import {
   TEST_SKILL_LISTENING,
   TEST_SKILL_READING,
@@ -18,8 +18,89 @@ import {
   getQuestionBankSectionDisplayTitle,
   getSectionsBySkill,
 } from '@/features/mentor/utils/mentorTestContentUtils';
+import axios from 'axios';
+import {
+  buildQuestionBankApiPayload,
+  mapPathBankApiToBank,
+} from '@/features/mentor/utils/mentorQuestionBankPayloadUtils';
+import { uploadListeningFilesInSections, validateListeningSectionsHaveAudio } from '@/features/mentor/utils/mentorQuestionBankUploadUtils';
 
 const QB_STORAGE_KEY = 'mentor_question_banks_v1';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/+$/, '') + '/api';
+const QB_LIST_CACHE_TTL_MS = 60_000;
+
+let banksApiCache = null;
+let mentorCoursesApiCache = null;
+
+export function invalidateQuestionBankListCache() {
+  banksApiCache = null;
+  mentorCoursesApiCache = null;
+}
+
+function readBanksCache() {
+  if (!banksApiCache) return null;
+  if (Date.now() - banksApiCache.fetchedAt > QB_LIST_CACHE_TTL_MS) {
+    banksApiCache = null;
+    return null;
+  }
+  return banksApiCache.banks;
+}
+
+function writeBanksCache(banks) {
+  banksApiCache = { banks, fetchedAt: Date.now() };
+}
+
+function readMentorCoursesCache() {
+  if (!mentorCoursesApiCache) return null;
+  if (Date.now() - mentorCoursesApiCache.fetchedAt > QB_LIST_CACHE_TTL_MS) {
+    mentorCoursesApiCache = null;
+    return null;
+  }
+  return mentorCoursesApiCache.courses;
+}
+
+function writeMentorCoursesCache(courses) {
+  mentorCoursesApiCache = { courses, fetchedAt: Date.now() };
+}
+
+async function fetchMentorCoursesCached(options = {}) {
+  const { force = false } = options;
+  if (!force) {
+    const cached = readMentorCoursesCache();
+    if (cached) {
+      return { ok: true, courses: cached, total: cached.length };
+    }
+  }
+
+  const res = await fetchMentorCourses();
+  if (res.ok) {
+    writeMentorCoursesCache(Array.isArray(res.courses) ? res.courses : []);
+  }
+  return res;
+}
+
+function getAuthHeaders() {
+  const user = getUser();
+  const userId = user?.userId ?? user?.UserId;
+  const headers = { 'Content-Type': 'application/json' };
+  if (userId) {
+    headers['x-user-id'] = String(userId);
+  }
+  return headers;
+}
+
+function mapPathsToChapters(paths = []) {
+  return paths.map((path, pathIndex) => ({
+    PathId: path.PathId,
+    PathName: String(path.PathName ?? '').trim() || `Chương ${pathIndex + 1}`,
+    Order: path.Order ?? pathIndex + 1,
+    Nodes: (path.Nodes ?? []).map((node, nodeIndex) => ({
+      NodeId: node.NodeId,
+      NodeName: String(node.NodeName ?? '').trim() || `Bài ${nodeIndex + 1}`,
+      NodeOrder: node.NodeOrder ?? nodeIndex + 1,
+    })),
+  }));
+}
 
 function loadStoredBanks() {
   try {
@@ -69,8 +150,144 @@ function countSectionQuestions(sections = []) {
   return sections.reduce((sum, s) => sum + (s.Questions?.length ?? 0), 0);
 }
 
+function mapApiBankRow(row) {
+  return {
+    BankId: row.BankId ?? row.bankId ?? row.id,
+    CourseId: row.CourseId ?? row.courseId,
+    PathId: row.PathId ?? row.pathId ?? row.chapterId,
+    Title: row.Title ?? row.title ?? '',
+    Description: row.Description ?? row.description ?? '',
+    InstructorId: row.InstructorId ?? row.instructorId,
+    CreatedAt: row.CreatedAt ?? row.createdAt,
+    UpdatedAt: row.UpdatedAt ?? row.updatedAt,
+    Thumbnail: row.Thumbnail ?? null,
+    Sections: row.Sections ?? row.sections ?? [],
+  };
+}
+
+async function fetchQuestionBanksFromApi(options = {}) {
+  const { force = false } = options;
+  if (!force) {
+    const cached = readBanksCache();
+    if (cached) {
+      return { ok: true, banks: cached };
+    }
+  }
+
+  try {
+    const response = await axios.get(`${API_BASE}/questionBank/getAll`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.data?.success) {
+      return {
+        ok: false,
+        message: response.data?.message ?? 'Không lấy được danh sách ngân hàng câu hỏi.',
+        banks: [],
+      };
+    }
+
+    const banks = (response.data.data ?? []).map(mapApiBankRow);
+    writeBanksCache(banks);
+    return { ok: true, banks };
+  } catch (error) {
+    console.error('[fetchQuestionBanksFromApi]', error);
+    return {
+      ok: false,
+      message: 'Lỗi kết nối khi tải ngân hàng câu hỏi.',
+      banks: [],
+    };
+  }
+}
+
+function resolveCourseStatus(course) {
+  if (!course) return 'draft';
+  if (course.status === 'published' || course.status === 'PUBLISHED') return 'published';
+  if (course.IsPublished === 1 || course.IsPublished === true) return 'published';
+  return 'draft';
+}
+
+function buildSummaryFromBanks(banks = [], courses = []) {
+  const courseMap = new Map(
+    courses.map((course) => [String(course.CourseId ?? course.courseId), course]),
+  );
+  const byCourse = new Map();
+
+  banks.forEach((bank) => {
+    const courseId = bank.CourseId;
+    const key = String(courseId);
+    const existing = byCourse.get(key) ?? {
+      CourseId: Number(courseId),
+      CourseName: '',
+      Description: '',
+      Status: 'draft',
+      TotalQuestionCount: 0,
+      PublishedQuestionCount: 0,
+      DraftQuestionCount: 0,
+      ChapterWithQuestionCount: 0,
+      QuizCount: 0,
+      QuestionBankUpdatedAt: null,
+      Thumbnail: null,
+      BankIds: [],
+      LevelId: null,
+      LevelName: null,
+      LevelDisplayName: '',
+      CategoryId: null,
+      CategoryDisplayName: '',
+      UpdatedAt: null,
+      StudentCount: 0,
+    };
+
+    if (bank.Thumbnail) existing.Thumbnail = bank.Thumbnail;
+    existing.ChapterWithQuestionCount += 1;
+    if (bank.BankId != null && !existing.BankIds.includes(bank.BankId)) {
+      existing.BankIds.push(bank.BankId);
+    }
+    const updatedAt = bank.UpdatedAt;
+    if (
+      updatedAt &&
+      (!existing.QuestionBankUpdatedAt ||
+        new Date(updatedAt).getTime() > new Date(existing.QuestionBankUpdatedAt).getTime())
+    ) {
+      existing.QuestionBankUpdatedAt = updatedAt;
+    }
+
+    byCourse.set(key, existing);
+  });
+
+  return [...byCourse.values()]
+    .map((item) => {
+      const course = courseMap.get(String(item.CourseId));
+      if (!course) return item;
+
+      return {
+        ...item,
+        CourseName: course.CourseName ?? course.courseName ?? '',
+        Description: course.Description ?? course.description ?? '',
+        Status: resolveCourseStatus(course),
+        Thumbnail: course.Thumbnail ?? item.Thumbnail ?? null,
+        LevelId: course.LevelId ?? course.levelId ?? null,
+        LevelName: course.LevelName ?? course.levelName ?? null,
+        LevelDisplayName:
+          course.LevelDisplayName ?? course.levelName ?? course.level ?? '',
+        CategoryId: course.CategoryId ?? course.categoryId ?? null,
+        CategoryDisplayName:
+          course.CategoryDisplayName ?? course.categoryName ?? course.category ?? '',
+        UpdatedAt: course.UpdatedAt ?? course.updatedAt ?? null,
+        StudentCount: Number(course.StudentCount ?? course.studentCount ?? 0) || 0,
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.QuestionBankUpdatedAt ?? 0).getTime() -
+        new Date(a.QuestionBankUpdatedAt ?? 0).getTime(),
+    );
+}
+
 function filterByCourse(banks, courseId) {
-  return banks.filter((b) => String(b.courseId) === String(courseId));
+  return banks.filter(
+    (b) => String(b.CourseId ?? b.courseId) === String(courseId),
+  );
 }
 
 function countActiveQuestionsInSection(section) {
@@ -137,11 +354,11 @@ export async function getCourseQuestionBankActiveStats(courseId) {
   const bankByChapterId = new Map(banks.map((bank) => [String(bank.chapterId), bank]));
 
   const chapters = outlineChapters.map((outlineChapter) => {
-    const bank = bankByChapterId.get(String(outlineChapter.chapterId));
+    const bank = bankByChapterId.get(String(outlineChapter.PathId));
     if (!bank) {
       return {
-        chapterId: outlineChapter.chapterId,
-        chapterTitle: outlineChapter.chapterTitle,
+        PathId: outlineChapter.PathId,
+        PathName: outlineChapter.PathName,
         hasBank: false,
         totalActive: 0,
         questionCountBySkill: {
@@ -154,7 +371,7 @@ export async function getCourseQuestionBankActiveStats(courseId) {
     }
 
     const questionCountBySkill = countQuestionsBySkill(bank.sections ?? []);
-    const chapterLabel = bank.chapterTitle?.trim() || outlineChapter.chapterTitle;
+    const chapterLabel = bank.chapterTitle?.trim() || outlineChapter.PathName;
     const writingSectionGroups = getWritingSectionGroupsFromSections(bank.sections ?? []).map(
       (group) => ({
         sectionTempId: `${bank.chapterId}::${group.sectionTempId}`,
@@ -166,8 +383,8 @@ export async function getCourseQuestionBankActiveStats(courseId) {
     const totalActive = Object.values(questionCountBySkill).reduce((sum, count) => sum + count, 0);
 
     return {
-      chapterId: bank.chapterId,
-      chapterTitle: chapterLabel,
+      PathId: bank.chapterId,
+      PathName: chapterLabel,
       hasBank: true,
       totalActive,
       questionCountBySkill,
@@ -176,7 +393,7 @@ export async function getCourseQuestionBankActiveStats(courseId) {
   });
 
   banks.forEach((bank) => {
-    if (chapters.some((chapter) => String(chapter.chapterId) === String(bank.chapterId))) {
+    if (chapters.some((chapter) => String(chapter.PathId) === String(bank.chapterId))) {
       return;
     }
 
@@ -193,8 +410,8 @@ export async function getCourseQuestionBankActiveStats(courseId) {
     const totalActive = Object.values(questionCountBySkill).reduce((sum, count) => sum + count, 0);
 
     chapters.push({
-      chapterId: bank.chapterId,
-      chapterTitle: chapterLabel,
+      PathId: bank.chapterId,
+      PathName: chapterLabel,
       hasBank: true,
       totalActive,
       questionCountBySkill,
@@ -247,16 +464,130 @@ export async function getQuestionBanks() {
   return { ok: true, banks: getAllBanks() };
 }
 
-export async function getQuestionBankById(id) {
-  const bank = getAllBanks().find((b) => String(b.id) === String(id));
-  if (!bank) return { ok: false, message: 'Không tìm thấy question bank' };
-  return { ok: true, bank };
+/** Lấy ngân hàng câu hỏi 1 chương từ API. */
+export async function fetchPathQuestionBank(courseId, chapterId) {
+  try {
+    const response = await fetch(
+      `${API_BASE}/questionBank/courses/${Number(courseId)}/paths/${Number(chapterId)}/questions`,
+      { headers: getAuthHeaders() },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success || !data.data) {
+      return { ok: false, message: data.message ?? 'Chương chưa có ngân hàng câu hỏi.' };
+    }
+    return {
+      ok: true,
+      bank: mapPathBankApiToBank(data.data, courseId, chapterId),
+    };
+  } catch {
+    return { ok: false, message: 'Lỗi kết nối khi tải ngân hàng câu hỏi.' };
+  }
 }
 
-export function findQuestionBankByChapter(courseId, chapterId) {
+/** Danh sách Questions_Path của 1 bank. */
+export async function fetchBankPathList(bankId) {
+  try {
+    const response = await fetch(`${API_BASE}/questionBank/${Number(bankId)}/paths`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success || !data.data) {
+      return { ok: false, message: data.message ?? 'Không tìm thấy ngân hàng câu hỏi.' };
+    }
+    const row = data.data;
+    return {
+      ok: true,
+      bank: {
+        id: row.BankId,
+        BankId: row.BankId,
+        courseId: row.CourseId,
+        courseTitle: row.CourseName ?? '',
+        updatedAt: row.UpdatedAt,
+      },
+      paths: (row.Paths ?? []).map((path) => ({
+        PathId: path.PathId,
+        PathName: path.PathName,
+        Question_Path_Id: path.Question_Path_Id,
+        QuestionCount: Number(path.QuestionCount) || 0,
+      })),
+    };
+  } catch {
+    return { ok: false, message: 'Lỗi kết nối khi tải danh sách chương.' };
+  }
+}
+
+/** Lấy ngân hàng theo BankId + chapterId (pathId). */
+export async function fetchQuestionBankById(bankId, { chapterId } = {}) {
+  if (!chapterId) {
+    return { ok: false, message: 'Thiếu chapterId.' };
+  }
+  try {
+    const response = await fetch(
+      `${API_BASE}/questionBank/${Number(bankId)}/questions?pathId=${Number(chapterId)}`,
+      { headers: getAuthHeaders() },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success || !data.data) {
+      return { ok: false, message: data.message ?? 'Không tìm thấy ngân hàng câu hỏi.' };
+    }
+    return {
+      ok: true,
+      bank: mapPathBankApiToBank(data.data),
+    };
+  } catch {
+    return { ok: false, message: 'Lỗi kết nối khi tải ngân hàng câu hỏi.' };
+  }
+}
+
+export async function getQuestionBankById(bankId, { courseId, chapterId } = {}) {
+  if (courseId && chapterId) {
+    const res = await fetchPathQuestionBank(courseId, chapterId);
+    if (res.ok) return res;
+  }
+  return fetchQuestionBankById(bankId, { chapterId });
+}
+
+async function chapterQuestionsRequest(courseId, chapterId, suffix, options = {}) {
+  const response = await fetch(
+    `${API_BASE}/questionBank/courses/${Number(courseId)}/paths/${Number(chapterId)}/questions${suffix}`,
+    {
+      ...options,
+      headers: { ...getAuthHeaders(), ...(options.headers ?? {}) },
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) {
+    return { ok: false, message: data.message ?? 'Thao tác thất bại.' };
+  }
+  return { ok: true, data: data.data };
+}
+
+export function setChapterQuestionPublic(courseId, chapterId, questionId, isPublic) {
+  return chapterQuestionsRequest(courseId, chapterId, `/${Number(questionId)}/active`, {
+    method: 'PATCH',
+    body: JSON.stringify({ IsActive: Boolean(isPublic) }),
+  });
+}
+
+export function deleteChapterQuestion(courseId, chapterId, questionId) {
+  return chapterQuestionsRequest(courseId, chapterId, `/${Number(questionId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function setAllChapterQuestionsPublic(courseId, chapterId, isPublic) {
+  return chapterQuestionsRequest(courseId, chapterId, '/active-all', {
+    method: 'PATCH',
+    body: JSON.stringify({ IsActive: Boolean(isPublic) }),
+  });
+}
+
+export async function findQuestionBankByChapter(courseId, chapterId) {
+  const apiRes = await fetchPathQuestionBank(courseId, chapterId);
+  if (apiRes.ok) return apiRes;
+
   const bank = getAllBanks().find(
-    (b) =>
-      String(b.courseId) === String(courseId) && String(b.chapterId) === String(chapterId),
+    (b) => String(b.courseId) === String(courseId) && String(b.chapterId) === String(chapterId),
   );
   if (!bank) return { ok: false, message: 'Chương này chưa có ngân hàng câu hỏi' };
   return { ok: true, bank };
@@ -267,7 +598,30 @@ export async function getQuestionBankByChapter(courseId, chapterId) {
 }
 
 export async function getQuestionBanksByCourse(courseId) {
-  return { ok: true, banks: filterByCourse(getAllBanks(), courseId) };
+  try {
+    const response = await fetch(
+      `${API_BASE}/questionBank/courses/${Number(courseId)}/path-banks`,
+      { headers: getAuthHeaders() },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      return { ok: false, message: data.message, banks: [] };
+    }
+
+    const banks = (data.data ?? []).map((row) => ({
+      id: row.BankId,
+      BankId: row.BankId,
+      courseId: Number(courseId),
+      chapterId: row.PathId,
+      chapterTitle: row.PathName,
+      title: row.PathName,
+      totalQuestionCount: Number(row.QuestionCount) || 0,
+      updatedAt: row.UpdatedAt,
+    }));
+    return { ok: true, banks };
+  } catch {
+    return { ok: false, message: 'Lỗi kết nối.', banks: [] };
+  }
 }
 
 /** @deprecated — mỗi chương 1 bank, dùng getQuestionBankByChapter */
@@ -322,45 +676,20 @@ export async function getCourseChapterBankStats(courseId) {
   };
 }
 
-export async function getQuestionBankListSummaries() {
-  const banks = getAllBanks();
-  const byCourse = new Map();
+export async function getQuestionBankListSummaries(options = {}) {
+  const [apiRes, coursesRes] = await Promise.all([
+    fetchQuestionBanksFromApi(options),
+    fetchMentorCoursesCached(options),
+  ]);
 
-  mentorQuestionBankMock.forEach((item) => {
-    byCourse.set(item.courseId, { ...item });
-  });
+  if (!apiRes.ok) {
+    return { ok: false, message: apiRes.message, items: [] };
+  }
 
-  banks.forEach((bank) => {
-    const existing = byCourse.get(bank.courseId);
-    const qCount = bank.totalQuestionCount ?? countSectionQuestions(bank.sections);
-    const hasQuestions = qCount > 0;
+  const courses = coursesRes.ok ? coursesRes.courses ?? [] : [];
+  const items = buildSummaryFromBanks(apiRes.banks, courses);
 
-    if (existing) {
-      byCourse.set(bank.courseId, {
-        ...existing,
-        totalQuestionCount: (existing.totalQuestionCount ?? 0) + qCount,
-        draftQuestionCount: (existing.draftQuestionCount ?? 0) + (bank.draftQuestionCount ?? qCount),
-        chapterWithQuestionCount:
-          (existing.chapterWithQuestionCount ?? 0) + (hasQuestions ? 1 : 0),
-        questionBankUpdatedAt: bank.updatedAt ?? bank.questionBankUpdatedAt,
-      });
-    } else {
-      byCourse.set(bank.courseId, {
-        courseId: bank.courseId,
-        courseName: bank.courseTitle,
-        description: bank.description ?? '',
-        status: bank.status === 'PUBLISHED' ? 'published' : 'draft',
-        totalQuestionCount: qCount,
-        publishedQuestionCount: bank.publishedQuestionCount ?? 0,
-        draftQuestionCount: bank.draftQuestionCount ?? qCount,
-        chapterWithQuestionCount: hasQuestions ? 1 : 0,
-        quizCount: 0,
-        questionBankUpdatedAt: bank.updatedAt ?? bank.questionBankUpdatedAt,
-      });
-    }
-  });
-
-  return { ok: true, items: Array.from(byCourse.values()) };
+  return { ok: true, items };
 }
 
 export async function createQuestionBank(payload) {
@@ -368,35 +697,98 @@ export async function createQuestionBank(payload) {
     return { ok: false, message: 'Vui lòng chọn chương để tạo ngân hàng câu hỏi' };
   }
 
-  const existing = await getQuestionBankByChapter(payload.courseId, payload.chapterId);
-  if (existing.ok) {
-    return { ok: false, message: 'Chương này đã có ngân hàng câu hỏi' };
+  const userId = getUser()?.userId ?? getUser()?.UserId;
+  if (!userId) {
+    return { ok: false, message: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.' };
   }
 
-  const banks = loadStoredBanks();
-  const now = new Date().toISOString();
-  const questionCount = countSectionQuestions(payload.sections ?? []);
+  const courseId = Number(payload.courseId);
+  const pathId = Number(payload.chapterId);
+  const sections = payload.sections ?? [];
 
-  const newBank = {
-    id: nextId(),
-    courseId: payload.courseId,
-    courseTitle: payload.courseTitle ?? '',
-    chapterId: payload.chapterId,
-    chapterTitle: payload.chapterTitle ?? '',
-    title: payload.title?.trim() || payload.chapterTitle?.trim() || '',
-    description: payload.description ?? '',
-    sections: payload.sections ?? [],
-    totalQuestionCount: questionCount,
-    publishedQuestionCount: 0,
-    draftQuestionCount: questionCount,
-    createdAt: now,
-    updatedAt: now,
-    questionBankUpdatedAt: now,
-  };
+  if (!Number.isInteger(courseId) || !Number.isInteger(pathId)) {
+    return { ok: false, message: 'courseId hoặc chapterId không hợp lệ.' };
+  }
 
-  banks.unshift(newBank);
-  saveStoredBanks(banks);
-  return { ok: true, bank: newBank };
+  try {
+    let sectionsWithAudio;
+    try {
+      sectionsWithAudio = await uploadListeningFilesInSections(sections);
+    } catch (uploadError) {
+      return {
+        ok: false,
+        message: uploadError?.message ?? 'Không thể tải file nghe lên. Kiểm tra Cloudinary hoặc dùng link audio.',
+      };
+    }
+
+    const audioError = validateListeningSectionsHaveAudio(sectionsWithAudio);
+    if (audioError) {
+      return { ok: false, message: audioError };
+    }
+
+    const apiBody = buildQuestionBankApiPayload(sectionsWithAudio, {
+      isPublished: false,
+      bankDescription: payload.chapterTitle ?? null,
+    });
+
+    if (!apiBody.Questions.length) {
+      return { ok: false, message: 'Chưa có câu hỏi hợp lệ để lưu.' };
+    }
+
+    const response = await fetch(
+      `${API_BASE}/questionBank/courses/${courseId}/paths/${pathId}/questions`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(apiBody),
+      },
+    );
+
+    const rawText = await response.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      const hint =
+        response.status === 404
+          ? 'Backend chưa có API tạo câu hỏi — hãy restart server backend.'
+          : `Phản hồi không hợp lệ (HTTP ${response.status}).`;
+      return { ok: false, message: hint };
+    }
+
+    if (!response.ok || !data.success) {
+      return {
+        ok: false,
+        message: data.message ?? `Tạo ngân hàng câu hỏi thất bại (HTTP ${response.status}).`,
+      };
+    }
+
+    invalidateQuestionBankListCache();
+
+    const saved = data.data ?? {};
+    const fetchRes = await fetchPathQuestionBank(courseId, pathId);
+
+    return {
+      ok: true,
+      bank: fetchRes.ok
+        ? fetchRes.bank
+        : {
+            id: saved.BankId,
+            BankId: saved.BankId,
+            courseId,
+            chapterId: pathId,
+            title: payload.title?.trim() || payload.chapterTitle?.trim() || '',
+            sections: sectionsWithAudio,
+            totalQuestionCount: saved.QuestionCount ?? apiBody.Questions.length,
+          },
+    };
+  } catch (error) {
+    console.error('[createQuestionBank]', error);
+    return {
+      ok: false,
+      message: error?.message ?? 'Lỗi kết nối khi lưu ngân hàng câu hỏi. Kiểm tra backend đang chạy.',
+    };
+  }
 }
 
 export async function updateQuestionBank(id, patch) {
@@ -431,43 +823,98 @@ export async function updateQuestionBank(id, patch) {
   return { ok: true, bank: banks[idx] };
 }
 
-export async function fetchCoursesForQB() {
-  return { ok: true, courses: mentorCoursesMock };
+export async function fetchCoursesForQB(options = {}) {
+  const [coursesRes, banksRes] = await Promise.all([
+    fetchMentorCoursesCached(options),
+    fetchQuestionBanksFromApi(options),
+  ]);
+
+  if (!coursesRes.ok) {
+    return { ok: false, message: coursesRes.message, courses: [] };
+  }
+
+  const courses = Array.isArray(coursesRes.courses) ? coursesRes.courses : [];
+  const courseIdsWithBank = new Set(
+    (banksRes.ok ? banksRes.banks : []).map((bank) => String(bank.CourseId)),
+  );
+
+  return {
+    ok: true,
+    courses: courses.filter(
+      (course) => !courseIdsWithBank.has(String(course.CourseId ?? course.courseId)),
+    ),
+  };
 }
 
 export async function fetchCourseForQB(courseId) {
-  const course = mentorCoursesMock.find((c) => String(c.courseId) === String(courseId));
-  if (!course) return { ok: false, message: 'Không tìm thấy khóa học' };
-  return { ok: true, course };
+  const id = String(courseId ?? '').trim();
+  if (!id) {
+    return { ok: false, message: 'Thiếu mã khóa học' };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/courses/my-courses/${id}?tab=course`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json();
+
+    if (response.ok && data.success && Array.isArray(data.data) && data.data[0]) {
+      return { ok: true, course: data.data[0] };
+    }
+
+    const coursesRes = await fetchMentorCourses();
+    if (coursesRes.ok) {
+      const course = (coursesRes.courses ?? []).find(
+        (item) => String(item.CourseId) === id,
+      );
+      if (course) {
+        return { ok: true, course };
+      }
+    }
+
+    return { ok: false, message: data.message ?? 'Không tìm thấy khóa học' };
+  } catch (error) {
+    console.error('[fetchCourseForQB]', error);
+    return { ok: false, message: 'Lỗi kết nối khi tải thông tin khóa học.' };
+  }
 }
 
 export async function fetchCourseContentOutlineForQB(courseId) {
-  await new Promise((r) => setTimeout(r, 150));
-  const detail = mentorCourseDetailById[Number(courseId)];
-  const paths = detail?.paths ?? [];
-  const chapters = paths.map((p, pathIndex) => ({
-    chapterId: p.PathId,
-    chapterTitle: p.PathName || `Chương ${pathIndex + 1}`,
-    order: p.PathOrder ?? pathIndex + 1,
-    lessons: (p.nodes ?? []).map((n, nodeIndex) => ({
-      lessonId: n.NodeId,
-      lessonTitle: n.NodeName || `Bài ${nodeIndex + 1}`,
-      order: n.NodeOrder ?? nodeIndex + 1,
-    })),
-  }));
-  return { ok: true, chapters };
+  try {
+    const response = await fetch(
+      `${API_BASE}/courses/my-courses/${courseId}/chapters`,
+      { headers: getAuthHeaders() },
+    );
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      return {
+        ok: false,
+        message: data.message ?? 'Không thể tải danh sách chương.',
+        chapters: [],
+      };
+    }
+
+    const paths = data.data?.Paths ?? [];
+    return { ok: true, chapters: mapPathsToChapters(paths) };
+  } catch (error) {
+    console.error('[fetchCourseContentOutlineForQB]', error);
+    return {
+      ok: false,
+      message: 'Lỗi kết nối khi tải danh sách chương.',
+      chapters: [],
+    };
+  }
 }
 
 export async function fetchChaptersForCourse(courseId) {
   const res = await fetchCourseContentOutlineForQB(courseId);
   if (!res.ok) return res;
   const chapters = res.chapters.map((ch) => ({
-    id: ch.chapterId,
-    chapterId: ch.chapterId,
-    courseId: Number(courseId),
-    title: ch.chapterTitle,
-    chapterTitle: ch.chapterTitle,
-    order: ch.order,
+    PathId: ch.PathId,
+    PathName: ch.PathName,
+    Order: ch.Order,
+    CourseId: Number(courseId),
   }));
   return { ok: true, chapters };
 }
@@ -480,12 +927,12 @@ export async function fetchChaptersWithoutQuestionBank(courseId) {
   const outline = await fetchCourseContentOutlineForQB(courseId);
   if (!outline.ok) return outline;
 
-  const banks = filterByCourse(getAllBanks(), courseId);
-  const bankChapterIds = new Set(banks.map((b) => String(b.chapterId)));
+  const banksRes = await getQuestionBanksByCourse(courseId);
+  const bankChapterIds = new Set((banksRes.banks ?? []).map((b) => String(b.chapterId)));
 
   return {
     ok: true,
-    chapters: outline.chapters.filter((ch) => !bankChapterIds.has(String(ch.chapterId))),
+    chapters: outline.chapters.filter((ch) => !bankChapterIds.has(String(ch.PathId))),
   };
 }
 

@@ -10,7 +10,7 @@ export default function SurveyPage() {
   const navigate = useNavigate();
 
   const user = (() => {
-    try { return JSON.parse(sessionStorage.getItem('user')) || {}; }
+    try { return JSON.parse(localStorage.getItem('user')) || {}; }
     catch { return {}; }
   })();
 
@@ -47,7 +47,6 @@ export default function SurveyPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // SỬA: Hàm xử lý click chọn nhiều lĩnh vực
   const handleCategoryClick = (id) => {
     if (selectedCategories.includes(id)) {
       // Đã chọn rồi thì ấn lại sẽ Bỏ chọn
@@ -73,7 +72,7 @@ export default function SurveyPage() {
       const result = await saveOnboardingApi(user.userId, selectedCategories, selectedLevel, goal.trim());
       if (result.ok) {
         const updatedUser = { ...user, isFirstLogin: false };
-        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+        localStorage.setItem('user', JSON.stringify(updatedUser));
         localStorage.setItem('user_goal', goal.trim());
         toast.success(result.data.message || 'Đã lưu thông tin thành công!');
         navigate(getPostLoginPath(updatedUser, { isFirstLogin: false }));
@@ -108,7 +107,7 @@ export default function SurveyPage() {
           </p>
         </div>
 
-        <div className="survey-content" style={{ marginTop: '30px' }}>
+        <div className="survey-content">
 
           {step === 1 && (
             <div className="survey-grid">

@@ -22,7 +22,7 @@ function normalizeNode(raw = {}) {
     NodeName: raw.nodeName ?? raw.NodeName ?? '',
     NodeOrder: raw.nodeOrder ?? raw.NodeOrder ?? 0,
     Description: raw.description ?? raw.Description ?? '',
-    materials: (raw.materials ?? []).map(normalizeMaterial),
+    materials: (raw.materials ?? raw.Materials ?? []).map(normalizeMaterial),
   };
 }
 
@@ -31,7 +31,7 @@ function normalizePath(raw = {}) {
     pathId: raw.pathId ?? raw.PathId ?? null,
     PathName: raw.pathName ?? raw.PathName ?? '',
     Description: raw.description ?? raw.Description ?? '',
-    nodes: (raw.nodes ?? []).map(normalizeNode),
+    nodes: (raw.nodes ?? raw.Nodes ?? []).map(normalizeNode),
   };
 }
 
@@ -40,7 +40,7 @@ function normalizePath(raw = {}) {
  */
 export function normalizeMentorCourseDetail(raw = {}) {
   const base = normalizeMentorCourse(raw);
-  const paths = (raw.paths ?? []).map(normalizePath);
+  const paths = (raw.paths ?? raw.Paths ?? []).map(normalizePath);
 
   const totalChapters = paths.length;
   const totalLessonsFromPaths = paths.reduce(
@@ -67,6 +67,7 @@ export const MENTOR_COURSE_DETAIL_TABS = {
   COURSE: 'course',
   CONTENT: 'content',
   STUDENTS: 'students',
+  COMMENTS: 'comments',
 };
 
 export function parseMentorCourseDetailTab(searchParams) {
@@ -77,6 +78,9 @@ export function parseMentorCourseDetailTab(searchParams) {
   }
   if (tab === MENTOR_COURSE_DETAIL_TABS.STUDENTS) {
     return MENTOR_COURSE_DETAIL_TABS.STUDENTS;
+  }
+  if (tab === MENTOR_COURSE_DETAIL_TABS.COMMENTS) {
+    return MENTOR_COURSE_DETAIL_TABS.COMMENTS;
   }
   return MENTOR_COURSE_DETAIL_TABS.COURSE;
 }

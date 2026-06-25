@@ -13,6 +13,7 @@ import MentorCourseLeaveDialog from '@/features/mentor/components/course/MentorC
 import MentorChapterDraftDialog from '@/features/mentor/components/course/MentorChapterDraftDialog';
 import { useMentorCourseLeaveGuard } from '@/features/mentor/hooks/useMentorCourseLeaveGuard';
 import { saveCreateCourseContent } from '@/features/mentor/services/mentorCourseService';
+import { uploadPendingMaterialsInPaths } from '@/features/mentor/utils/mentorMaterialUploadUtils';
 import { getUser } from '@/features/auth/utils/authUtils';
 import {
   createEmptyMaterial,
@@ -488,9 +489,15 @@ export default function MentorCreateCourseContentPage() {
 
     setSubmitting(true);
     try {
-      const result = await saveCreateCourseContent(course, paths);
-      if (!result.ok) return;
+      const uploadedPaths = await uploadPendingMaterialsInPaths(paths);
+      const result = await saveCreateCourseContent(course, uploadedPaths);
+      if (!result.ok) {
+        toast.error('Không thể lưu nội dung. Vui lòng thử lại.');
+        return;
+      }
       navigate('/mentor/courses/create/review');
+    } catch (error) {
+      toast.error(error?.message || 'Không thể tải học liệu lên. Vui lòng thử lại.');
     } finally {
       setSubmitting(false);
     }

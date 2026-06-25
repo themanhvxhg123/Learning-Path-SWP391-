@@ -202,7 +202,7 @@ export default function MyCoursesListPage() {
             stageCount = dbCourse.Paths.length;
           }
           // 4. Kiểm tra ảnh Thumbnail bị lỗi
-          let courseImage = dbCourse.Thumbnail;
+          let courseImage = dbCourse.Thumbnail || dbCourse.thumbnail;
           if (courseImage === 'CHƯA FIX LỖI ẢNH') {
             courseImage = null;
           }

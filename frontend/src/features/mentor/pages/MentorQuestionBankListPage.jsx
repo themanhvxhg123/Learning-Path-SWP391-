@@ -3,7 +3,7 @@
  * Route: /mentor/question-banks
  * Search: Header SearchBox (param q) — không nằm trong toolbar.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Breadcrumbs, Link as MuiLink, Typography } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -13,7 +13,6 @@ import MentorQuestionBankList from '@/features/mentor/components/questionBank/Me
 import MentorQuestionBankListPagination, {
   QB_LIST_PAGE_SIZE,
 } from '@/features/mentor/components/questionBank/MentorQuestionBankListPagination';
-import MentorSelectCourseForQBDialog from '@/features/mentor/components/questionBank/MentorSelectCourseForQBDialog';
 import { mentorQuestionBankFilterOptionsMock } from '@/features/mentor/data/mentorQuestionBankMock';
 import {
   fetchCoursesForQB,
@@ -30,6 +29,10 @@ import {
   QB_LIST_DEFAULTS,
 } from '@/features/mentor/utils/mentorQuestionBankListParams';
 
+const MentorSelectCourseForQBDialog = lazy(
+  () => import('@/features/mentor/components/questionBank/MentorSelectCourseForQBDialog'),
+);
+
 const PAGE_SIZE = QB_LIST_PAGE_SIZE;
 
 export default function MentorQuestionBankListPage() {
@@ -39,13 +42,14 @@ export default function MentorQuestionBankListPage() {
   const [loading, setLoading] = useState(true);
   const [selectDialogOpen, setSelectDialogOpen] = useState(false);
   const [coursesWithoutQB, setCoursesWithoutQB] = useState([]);
+  const coursesPrefetchStartedRef = useRef(false);
 
   const queryState = useMemo(() => parseQBListParams(searchParams), [searchParams]);
   const showReset = hasActiveQBFilters(queryState);
 
   const activeFilterChips = useMemo(
     () => buildQBActiveChips(queryState, mentorQuestionBankFilterOptionsMock),
-    [queryState]
+    [queryState],
   );
 
   useEffect(() => {
@@ -71,52 +75,100 @@ export default function MentorQuestionBankListPage() {
     };
   }, []);
 
+  const prefetchCoursesForDialog = useCallback(() => {
+    if (coursesPrefetchStartedRef.current) return;
+    coursesPrefetchStartedRef.current = true;
+
+    fetchCoursesForQB().then((res) => {
+      if (res.ok) {
+        setCoursesWithoutQB(res.courses);
+      } else {
+        coursesPrefetchStartedRef.current = false;
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (!selectDialogOpen) return;
-    fetchCoursesForQB().then((res) => {
-      if (res.ok) setCoursesWithoutQB(res.courses);
-    });
-  }, [selectDialogOpen]);
+    prefetchCoursesForDialog();
+  }, [selectDialogOpen, prefetchCoursesForDialog]);
 
-  const updateQuery = (patch) => {
-    setSearchParams(
-      buildQBListSearchParams({ ...queryState, ...patch }, searchParams),
-      { replace: true }
-    );
-  };
+  const updateQuery = useCallback(
+    (patch) => {
+      setSearchParams(
+        buildQBListSearchParams({ ...queryState, ...patch }, searchParams),
+        { replace: true },
+      );
+    },
+    [queryState, searchParams, setSearchParams],
+  );
 
   const filteredItems = useMemo(
     () => filterAndSortQBItems(items, queryState),
-    [items, queryState]
+    [items, queryState],
   );
 
   const pagination = useMemo(
     () => paginateQBItems(filteredItems, queryState.page, PAGE_SIZE),
-    [filteredItems, queryState.page]
+    [filteredItems, queryState.page],
   );
 
   useEffect(() => {
     if (!loading && queryState.page !== pagination.page) {
       updateQuery({ page: pagination.page });
     }
-  }, [loading, queryState.page, pagination.page]);
+  }, [loading, queryState.page, pagination.page, updateQuery]);
 
-  const handleStatusChange = (v) => updateQuery({ status: v, page: 1 });
-  const handleQuestionStatusChange = (v) => updateQuery({ questionStatus: v, page: 1 });
-  const handleSortChange = (v) => updateQuery({ sort: v, page: 1 });
-  const handlePageChange = (page) => {
-    updateQuery({ page });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  const handleReset = () => setSearchParams(resetQBListParams(searchParams), { replace: true });
-  const handleRemoveChip = ({ type }) => {
-    const defaults = {
-      q: '',
-      status: QB_LIST_DEFAULTS.status,
-      questionStatus: QB_LIST_DEFAULTS.questionStatus,
-    };
-    if (type in defaults) updateQuery({ [type]: defaults[type], page: 1 });
-  };
+  const handleStatusChange = useCallback(
+    (value) => updateQuery({ status: value, page: 1 }),
+    [updateQuery],
+  );
+  const handleQuestionStatusChange = useCallback(
+    (value) => updateQuery({ questionStatus: value, page: 1 }),
+    [updateQuery],
+  );
+  const handleSortChange = useCallback(
+    (value) => updateQuery({ sort: value, page: 1 }),
+    [updateQuery],
+  );
+  const handlePageChange = useCallback(
+    (page) => {
+      updateQuery({ page });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [updateQuery],
+  );
+  const handleReset = useCallback(
+    () => setSearchParams(resetQBListParams(searchParams), { replace: true }),
+    [searchParams, setSearchParams],
+  );
+  const handleRemoveChip = useCallback(
+    ({ type }) => {
+      const defaults = {
+        q: '',
+        status: QB_LIST_DEFAULTS.status,
+        questionStatus: QB_LIST_DEFAULTS.questionStatus,
+      };
+      if (type in defaults) updateQuery({ [type]: defaults[type], page: 1 });
+    },
+    [updateQuery],
+  );
+
+  const handleOpenSelectDialog = useCallback(() => {
+    prefetchCoursesForDialog();
+    setSelectDialogOpen(true);
+  }, [prefetchCoursesForDialog]);
+
+  const handleCloseSelectDialog = useCallback(() => {
+    setSelectDialogOpen(false);
+  }, []);
+
+  const handleSelectCourse = useCallback(
+    (course) => {
+      navigate(`/mentor/question-banks/create?courseId=${course.CourseId}`);
+    },
+    [navigate],
+  );
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto' }}>
@@ -149,7 +201,9 @@ export default function MentorQuestionBankListPage() {
 
         <AppButton
           startIcon={<AddRoundedIcon />}
-          onClick={() => setSelectDialogOpen(true)}
+          onClick={handleOpenSelectDialog}
+          onMouseEnter={prefetchCoursesForDialog}
+          onFocus={prefetchCoursesForDialog}
           sx={{
             height: 44,
             px: 2.5,
@@ -207,14 +261,16 @@ export default function MentorQuestionBankListPage() {
         </>
       )}
 
-      <MentorSelectCourseForQBDialog
-        open={selectDialogOpen}
-        onClose={() => setSelectDialogOpen(false)}
-        courses={coursesWithoutQB}
-        onSelect={(course) =>
-          navigate(`/mentor/question-banks/create?courseId=${course.courseId}`)
-        }
-      />
+      {selectDialogOpen && (
+        <Suspense fallback={null}>
+          <MentorSelectCourseForQBDialog
+            open={selectDialogOpen}
+            onClose={handleCloseSelectDialog}
+            courses={coursesWithoutQB}
+            onSelect={handleSelectCourse}
+          />
+        </Suspense>
+      )}
     </Box>
   );
 }

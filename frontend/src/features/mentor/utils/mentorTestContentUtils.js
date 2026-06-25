@@ -18,7 +18,7 @@ export const TEST_SKILLS = [TEST_SKILL_LISTENING, TEST_SKILL_READING, TEST_SKILL
 export const TEST_SKILL_LABELS = {
   [TEST_SKILL_LISTENING]: 'Nghe',
   [TEST_SKILL_READING]: 'Đọc',
-  [TEST_SKILL_WRITING]: 'Từ vựng / Ngữ pháp',
+  [TEST_SKILL_WRITING]: 'Trắc nghiệm',
 };
 
 export const TEST_SKILL_QB_LABELS = TEST_SKILL_LABELS;
@@ -32,7 +32,74 @@ export const TEST_SKILL_CHIP_COLORS = {
 export const LISTENING_SOURCE_UPLOAD = 'UPLOAD';
 export const LISTENING_SOURCE_LINK = 'LINK';
 
-export const AUDIO_ALLOWED_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.webm'];
+export const AUDIO_ALLOWED_EXTENSIONS = ['.mp3', '.mp4'];
+
+/** Đuôi file không dấu chấm — dùng khi so khớp tên file. */
+export const AUDIO_ALLOWED_EXTENSION_NAMES = ['mp3', 'mp4'];
+
+const AUDIO_ALLOWED_MIME_TYPES = new Set([
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/mp4',
+  'video/mp4',
+]);
+
+/** Dùng cho input[type=file] — hỗ trợ cả MIME và đuôi .mp3 / .mp4. */
+export const LISTENING_AUDIO_FILE_ACCEPT =
+  'audio/mpeg,audio/mp3,audio/mp4,video/mp4,.mp3,.mp4';
+
+/** Khớp giới hạn Cloudinary free tier — 10 MB. */
+export const AUDIO_MAX_BYTES = 10 * 1024 * 1024;
+
+export const LISTENING_AUDIO_INVALID_TYPE_MESSAGE =
+  'Chỉ hỗ trợ file đuôi .mp3 hoặc .mp4.';
+
+export const LISTENING_AUDIO_MAX_SIZE_MESSAGE =
+  'File quá lớn. Dung lượng tối đa là 10 MB.';
+
+export function getListeningAudioMaxSizeLabel() {
+  return '10 MB';
+}
+
+/** Lấy đuôi file (mp3, mp4…) — không phân biệt hoa thường. */
+export function getListeningAudioExtension(fileName) {
+  const match = String(fileName ?? '')
+    .trim()
+    .toLowerCase()
+    .match(/\.([a-z0-9]+)$/);
+  return match?.[1] ?? null;
+}
+
+export function isAllowedListeningAudioExtension(ext) {
+  if (!ext) return false;
+  return AUDIO_ALLOWED_EXTENSION_NAMES.includes(String(ext).trim().toLowerCase());
+}
+
+export function isAllowedAudioFile(file) {
+  if (!file) return false;
+  const ext = getListeningAudioExtension(file.name);
+  if (isAllowedListeningAudioExtension(ext)) return true;
+  const mime = String(file.type ?? '').trim().toLowerCase();
+  return AUDIO_ALLOWED_MIME_TYPES.has(mime);
+}
+
+export function isAllowedListeningAudioFileName(fileName) {
+  return isAllowedListeningAudioExtension(getListeningAudioExtension(fileName));
+}
+
+/** Kiểm tra định dạng + dung lượng file audio bài nghe. */
+export function validateListeningAudioFile(file) {
+  if (!file) {
+    return { ok: false, message: 'Vui lòng chọn file .mp3 hoặc .mp4.' };
+  }
+  if (!isAllowedAudioFile(file)) {
+    return { ok: false, message: LISTENING_AUDIO_INVALID_TYPE_MESSAGE };
+  }
+  if (Number(file.size) > AUDIO_MAX_BYTES) {
+    return { ok: false, message: LISTENING_AUDIO_MAX_SIZE_MESSAGE };
+  }
+  return { ok: true };
+}
 
 export function getListeningSectionFields() {
   return {
@@ -44,12 +111,8 @@ export function getListeningSectionFields() {
   };
 }
 
-export function isAllowedAudioFile(file) {
-  if (!file?.name) return false;
-  const lower = file.name.toLowerCase();
-  if (AUDIO_ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))) return true;
-  if (file.type?.startsWith('audio/')) return true;
-  return false;
+function isBrowserFile(value) {
+  return typeof File !== 'undefined' && value instanceof File;
 }
 
 function isSimpleUrl(value) {
@@ -413,7 +476,8 @@ export function createQuestionBankSkillSections() {
 
 /** Giữ dữ liệu bank hiện có, bổ sung bài trống cho kỹ năng còn thiếu. */
 export function ensureQuestionBankSkillSections(sections = []) {
-  const persistedSections = getNonEmptyQuestionBankSections(sections);
+  const normalized = consolidateWritingSections(sections);
+  const persistedSections = getNonEmptyQuestionBankSections(normalized);
   return TEST_SKILLS.flatMap((skill) => {
     const skillSections = getSectionsBySkill(persistedSections, skill);
     return skillSections.length > 0 ? skillSections : [createEmptyTestSection(skill)];
@@ -437,17 +501,44 @@ export function getSectionBaiNumber(section, sections = []) {
 
 export function getQuestionBankSectionNameFallback(section, sections = []) {
   const index = getSectionBaiNumber(section, sections);
-  if (section?.SkillType === TEST_SKILL_WRITING) {
-    return `Nhóm ${index}`;
-  }
   return `Bài số ${index}`;
 }
 
 export function getQuestionBankSectionNamePlaceholder(section) {
-  if (section?.SkillType === TEST_SKILL_WRITING) {
-    return 'Chưa có tên nhóm';
-  }
   return 'Chưa có tên bài';
+}
+
+/** Trắc nghiệm (WRITING) dùng một list phẳng — không thêm/xóa bài con. */
+export function supportsQuestionBankMultiSection(skillType) {
+  return skillType !== TEST_SKILL_WRITING;
+}
+
+/** Gộp mọi section WRITING thành một (migrate data cũ có nhiều nhóm). */
+export function consolidateWritingSections(sections = []) {
+  const writingSections = getSectionsBySkill(sections, TEST_SKILL_WRITING);
+  if (writingSections.length <= 1) return sections;
+
+  const mergedQuestions = writingSections.flatMap((section) => section.Questions ?? []);
+  const primary = {
+    ...writingSections[0],
+    Questions: mergedQuestions,
+    DisplayName: '',
+    SectionTitle: '',
+    Description: '',
+  };
+
+  let merged = false;
+  return sections.reduce((acc, section) => {
+    if (section.SkillType !== TEST_SKILL_WRITING) {
+      acc.push(section);
+      return acc;
+    }
+    if (!merged) {
+      acc.push(primary);
+      merged = true;
+    }
+    return acc;
+  }, []);
 }
 
 /** @deprecated use getQuestionBankSectionNameFallback — kept for imports */
@@ -478,6 +569,20 @@ export function getNonEmptyQuestionBankSections(sections = []) {
       Questions: getFilledTestQuestions(section.Questions),
     }))
     .filter((section) => section.Questions.length > 0);
+}
+
+/** Trim text fields trước khi gửi API — giữ nguyên space khi đang nhập trên form. */
+export function normalizeQuestionBankSectionForSave(section) {
+  const next = {
+    ...section,
+    SectionTitle: String(section.SectionTitle ?? '').trim(),
+    Description: String(section.Description ?? '').trim(),
+    DisplayName: String(section.DisplayName ?? '').trim(),
+  };
+  if (section.SkillType === TEST_SKILL_LISTENING) {
+    next.AudioUrl = String(section.AudioUrl ?? '').trim();
+  }
+  return next;
 }
 
 export function getSectionDisplayTitle(section) {
@@ -640,6 +745,15 @@ export function validateTestMaterial(material, options = {}) {
         sErrors._audio = 'Vui lòng tải file audio hoặc nhập link nghe';
       } else if (hasLink && !isSimpleUrl(audioUrl)) {
         sErrors.AudioUrl = 'Vui lòng nhập link audio hoặc video nghe hợp lệ';
+      } else if (isBrowserFile(section.File)) {
+        const fileCheck = validateListeningAudioFile(section.File);
+        if (!fileCheck.ok) {
+          sErrors.File = fileCheck.message;
+        }
+      } else if (hasFile && section.FileName && !isAllowedListeningAudioFileName(section.FileName)) {
+        sErrors.File = LISTENING_AUDIO_INVALID_TYPE_MESSAGE;
+      } else if (hasFile && Number(section.FileSize) > AUDIO_MAX_BYTES) {
+        sErrors.File = LISTENING_AUDIO_MAX_SIZE_MESSAGE;
       }
     }
 

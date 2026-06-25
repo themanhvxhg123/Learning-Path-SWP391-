@@ -2,7 +2,7 @@
  * MentorQuestionBankCreatePage
  * Route: /mentor/question-banks/create?courseId=1[&chapterId=2]
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import { useNavigate } from 'react-router-dom';
@@ -15,8 +15,12 @@ import MentorQuestionBankDetailHeader from '@/features/mentor/components/questio
 import MentorQuestionBankRightRail from '@/features/mentor/components/questionBank/MentorQuestionBankRightRail';
 import MentorQuestionBankSkillNav from '@/features/mentor/components/questionBank/MentorQuestionBankSkillNav';
 import useQuestionBankCreateBootstrap, {
+  buildQuestionBankSectionsSnapshot,
   clearQuestionBankCreateDraft,
+  writeQuestionBankCreateDraft,
 } from '@/features/mentor/hooks/useQuestionBankCreateBootstrap';
+import { useQuestionBankCreateLeaveGuard } from '@/features/mentor/hooks/useQuestionBankCreateLeaveGuard';
+import MentorCourseLeaveDialog from '@/features/mentor/components/course/MentorCourseLeaveDialog';
 import {
   SCORING_MODE_AUTO,
   countActiveQuestionsBySkill,
@@ -24,19 +28,21 @@ import {
   getFilledQuestionCount,
   getNonEmptyQuestionBankSections,
   getQuestionBankSectionNameFallback,
+  normalizeQuestionBankSectionForSave,
   getSectionBaiNumber,
   getSectionsBySkill,
+  consolidateWritingSections,
   scrollToQuestionBankItem,
+  supportsQuestionBankMultiSection,
   validateTestMaterial,
 } from '@/features/mentor/utils/mentorTestContentUtils';
-import { isMentorCoursePublished } from '@/features/mentor/utils/mentorCourseUtils';
 import { PRIMARY } from '@/features/mentor/components/course/mentorCourseCreateStyles';
 import { HEADER_HEIGHT } from '@/shared/layout/MainLayout';
 import { createQuestionBank } from '@/features/mentor/services/questionBankService';
 
-function validateForm(chapterId, chaptersCount = 0) {
+function validateForm(chapterId, pathsCount = 0) {
   const errors = {};
-  if (chaptersCount === 0) {
+  if (pathsCount === 0) {
     errors.chapterId = 'Khóa học chưa có chương';
   } else if (!chapterId) {
     errors.chapterId = 'Vui lòng chọn chương từ mục lục bên phải';
@@ -47,15 +53,18 @@ function validateForm(chapterId, chaptersCount = 0) {
 export default function MentorQuestionBankCreatePage() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [errors, setErrors] = useState({});
+  const [baselineSnapshot, setBaselineSnapshot] = useState('');
 
   const {
     courseId,
     chapterId,
     course,
-    courseChapters,
+    coursePaths,
     loading,
     workspaceKey,
+    editorReadyKey,
     sections,
     setSections,
     sectionErrors,
@@ -64,17 +73,17 @@ export default function MentorQuestionBankCreatePage() {
     setActiveSkill,
     activeSectionId,
     setActiveSectionId,
-    selectedChapter,
-    hasChapters,
+    selectedPath,
+    hasPaths,
     canUseGenerator,
     selectChapter,
   } = useQuestionBankCreateBootstrap();
 
-  const coursePublished = isMentorCoursePublished(course);
-  const bankTitle = selectedChapter?.chapterTitle?.trim() ?? '';
+  const coursePublished = course?.IsPublished === true || course?.IsPublished === 1;
+  const bankTitle = selectedPath?.PathName?.trim() ?? '';
 
   const courseCategory = useMemo(
-    () => [course?.categoryName, course?.levelName].filter(Boolean).join(' · '),
+    () => [course?.CategoryDisplayName, course?.LevelDisplayName].filter(Boolean).join(' · '),
     [course],
   );
 
@@ -83,6 +92,68 @@ export default function MentorQuestionBankCreatePage() {
     () => countActiveQuestionsBySkill(sections),
     [sections],
   );
+
+  const syncedWorkspaceRef = useRef('');
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
+
+  const isDirty = useMemo(
+    () =>
+      !loading &&
+      Boolean(chapterId) &&
+      buildQuestionBankSectionsSnapshot(sections) !== baselineSnapshot,
+    [baselineSnapshot, chapterId, loading, sections],
+  );
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!chapterId) {
+      syncedWorkspaceRef.current = '';
+      return;
+    }
+
+    if (editorReadyKey !== workspaceKey) return;
+    if (syncedWorkspaceRef.current === workspaceKey) return;
+
+    syncedWorkspaceRef.current = workspaceKey;
+    setBaselineSnapshot(buildQuestionBankSectionsSnapshot(sectionsRef.current));
+  }, [chapterId, editorReadyKey, loading, workspaceKey]);
+
+  const persistDraft = useCallback(async () => {
+    if (!courseId || !chapterId) {
+      toast.error('Vui lòng chọn chương trước khi lưu nháp.');
+      return false;
+    }
+    const ok = writeQuestionBankCreateDraft(courseId, chapterId, sections);
+    if (ok) {
+      setBaselineSnapshot(buildQuestionBankSectionsSnapshot(sections));
+    }
+    return ok;
+  }, [chapterId, courseId, sections]);
+
+  const {
+    dialogOpen: leaveDialogOpen,
+    saving: leaveSaving,
+    requestLeave,
+    handleStay,
+    handleDiscard,
+    handleSaveDraft: handleLeaveSaveDraft,
+  } = useQuestionBankCreateLeaveGuard({
+    isDirty,
+    onSaveDraft: persistDraft,
+    workspaceKey,
+  });
+
+  const handleSaveDraftClick = async () => {
+    setSavingDraft(true);
+    try {
+      const ok = await persistDraft();
+      if (ok) toast.success('Đã lưu bản nháp.');
+    } finally {
+      setSavingDraft(false);
+    }
+  };
 
   const skillSections = useMemo(
     () => getSectionsBySkill(sections, activeSkill),
@@ -102,7 +173,8 @@ export default function MentorQuestionBankCreatePage() {
     return getSectionBaiNumber(activeSection, sections) - 1;
   }, [activeSection, sections]);
 
-  const canDeleteActiveSection = skillSections.length > 1;
+  const canDeleteActiveSection =
+    supportsQuestionBankMultiSection(activeSkill) && skillSections.length > 1;
 
   useEffect(() => {
     if (!activeSection && skillSections[0]) {
@@ -111,16 +183,26 @@ export default function MentorQuestionBankCreatePage() {
   }, [activeSection, skillSections, setActiveSectionId]);
 
   const mapSectionsForSave = (sourceSections) =>
-    sourceSections.map((section) => ({
-      ...section,
-      DisplayName:
-        String(section.DisplayName ?? '').trim() ||
-        getQuestionBankSectionNameFallback(section, sourceSections),
-    }));
+    sourceSections.map((section) =>
+      normalizeQuestionBankSectionForSave({
+        ...section,
+        DisplayName:
+          String(section.DisplayName ?? '').trim() ||
+          getQuestionBankSectionNameFallback(section, sourceSections),
+      }),
+    );
 
   const handleChapterSelect = (nextChapterId) => {
+    if (String(nextChapterId) === String(chapterId)) return;
     if (errors.chapterId) setErrors((prev) => ({ ...prev, chapterId: undefined }));
-    selectChapter(nextChapterId);
+
+    requestLeave({
+      kind: 'chapter',
+      chapterId: nextChapterId,
+      onConfirm: (id) => {
+        selectChapter(id);
+      },
+    });
   };
 
   const handleSectionChange = (tempId, nextSection) => {
@@ -132,7 +214,7 @@ export default function MentorQuestionBankCreatePage() {
 
   const handleDeleteSection = (tempId) => {
     const section = sections.find((item) => item.tempId === tempId);
-    if (!section) return;
+    if (!section || !supportsQuestionBankMultiSection(section.SkillType)) return;
 
     const sameSkillSections = getSectionsBySkill(sections, section.SkillType);
     if (sameSkillSections.length <= 1) return;
@@ -173,6 +255,7 @@ export default function MentorQuestionBankCreatePage() {
   };
 
   const handleAddBai = () => {
+    if (!supportsQuestionBankMultiSection(activeSkill)) return;
     const newSection = createQuestionBankSection(activeSkill);
     setSections((prev) => [...prev, newSection]);
     setActiveSectionId(newSection.tempId);
@@ -194,11 +277,12 @@ export default function MentorQuestionBankCreatePage() {
   const validateSections = () => {
     if (!canUseGenerator) {
       return {
-        _context: hasChapters
+        _context: hasPaths
           ? 'Chọn chương từ mục lục bên phải trước khi tạo câu hỏi'
-          : 'Khóa học chưa có chương để tạo câu hỏi',
+          : 'Khóa học chưa có chương để tạo bộ câu hỏi',
       };
     }
+
     const materialErrors = validateTestMaterial(
       { Title: bankTitle, Sections: sections, ScoringMode: SCORING_MODE_AUTO },
       { inlineSections: true, skipTitle: true },
@@ -213,7 +297,7 @@ export default function MentorQuestionBankCreatePage() {
   };
 
   const handleSubmit = async () => {
-    const formErrors = validateForm(chapterId, courseChapters.length);
+    const formErrors = validateForm(chapterId, coursePaths.length);
     const sectionValidation = validateSections();
 
     if (Object.keys(formErrors).length > 0) {
@@ -237,12 +321,14 @@ export default function MentorQuestionBankCreatePage() {
 
     setSubmitting(true);
     try {
-      const sectionsPayload = mapSectionsForSave(getNonEmptyQuestionBankSections(sections));
+      const sectionsPayload = mapSectionsForSave(
+        getNonEmptyQuestionBankSections(consolidateWritingSections(sections)),
+      );
 
       const res = await createQuestionBank({
         title: bankTitle,
         courseId: Number(courseId),
-        courseTitle: course?.courseName ?? '',
+        courseTitle: course?.CourseName ?? '',
         chapterId: Number(chapterId),
         chapterTitle: bankTitle,
         sections: sectionsPayload,
@@ -255,7 +341,9 @@ export default function MentorQuestionBankCreatePage() {
 
       clearQuestionBankCreateDraft(courseId, chapterId);
       toast.success('Tạo ngân hàng câu hỏi thành công!');
-      navigate(`/mentor/question-banks/${res.bank.id}`);
+      navigate(
+        `/mentor/question-banks/${res.bank.BankId ?? res.bank.id}?courseId=${courseId}&chapterId=${chapterId}`,
+      );
     } catch {
       toast.error('Đã xảy ra lỗi. Vui lòng thử lại.');
     } finally {
@@ -266,9 +354,25 @@ export default function MentorQuestionBankCreatePage() {
   const footerActions = (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, width: '100%' }}>
       <AppButton
+        variant="outlined"
+        loading={savingDraft}
+        disabled={!chapterId || submitting || leaveSaving}
+        onClick={handleSaveDraftClick}
+        fullWidth
+        sx={{
+          height: 44,
+          fontSize: 14,
+          fontWeight: 700,
+          borderRadius: '999px',
+        }}
+      >
+        Lưu nháp
+      </AppButton>
+      <AppButton
         loading={submitting}
         startIcon={<SaveOutlinedIcon />}
         onClick={handleSubmit}
+        disabled={savingDraft || leaveSaving}
         fullWidth
         sx={{
           height: 44,
@@ -287,11 +391,10 @@ export default function MentorQuestionBankCreatePage() {
   );
 
   const handleBack = () => {
-    if (courseId) {
-      navigate(`/mentor/courses/${courseId}/questions`);
-      return;
-    }
-    navigate('/mentor/question-banks');
+    const destination = courseId
+      ? `/mentor/courses/${courseId}/questions`
+      : '/mentor/question-banks';
+    requestLeave({ kind: 'navigate', to: destination });
   };
 
   if (loading) {
@@ -308,9 +411,10 @@ export default function MentorQuestionBankCreatePage() {
         isCreateMode
         bankTitle={bankTitle}
         courseId={courseId}
-        courseName={course?.courseName}
+        course={course}
+        courseName={course?.CourseName ?? ''}
         courseCategory={courseCategory}
-        chapterTitle={selectedChapter?.chapterTitle}
+        chapterTitle={selectedPath?.PathName}
         coursePublished={coursePublished}
         totalQuestionCount={questionCount}
         questionCountBySkill={questionCountBySkill}
@@ -369,7 +473,7 @@ export default function MentorQuestionBankCreatePage() {
             disabled={!canUseGenerator}
             emptyHint={
               !canUseGenerator
-                ? hasChapters
+                ? hasPaths
                   ? 'Chọn chương từ mục lục khóa học ở cột bên phải để bắt đầu tạo bộ câu hỏi.'
                   : 'Khóa học chưa có chương để tạo bộ câu hỏi.'
                 : null
@@ -386,16 +490,16 @@ export default function MentorQuestionBankCreatePage() {
             activeSkill={activeSkill}
             activeSectionId={activeSectionId}
             onNavigateToItem={handleOutlineNavigate}
-            courseName={course?.courseName}
+            courseName={course?.CourseName ?? ''}
             courseCategory={courseCategory}
-            chapterTitle={selectedChapter?.chapterTitle}
-            courseChapters={courseChapters}
-            chaptersLoading={false}
-            selectedChapterId={chapterId}
+            chapterTitle={selectedPath?.PathName}
+            coursePaths={coursePaths}
+            pathsLoading={false}
+            selectedPathId={chapterId}
             chapterError={errors.chapterId}
             courseId={courseId}
             courseOutlineHint="Chọn chương để tạo hoặc mở ngân hàng câu hỏi tương ứng."
-            onChapterSelect={handleChapterSelect}
+            onPathSelect={handleChapterSelect}
           />
         </Box>
       </Box>
@@ -405,6 +509,14 @@ export default function MentorQuestionBankCreatePage() {
       </Box>
 
       <ScrollToTopButton avoidSelectors={['#app-site-footer', '#qb-mobile-footer-actions']} />
+
+      <MentorCourseLeaveDialog
+        open={leaveDialogOpen}
+        onStay={handleStay}
+        onDiscard={handleDiscard}
+        onSaveDraft={handleLeaveSaveDraft}
+        saving={leaveSaving}
+      />
     </Box>
   );
 }

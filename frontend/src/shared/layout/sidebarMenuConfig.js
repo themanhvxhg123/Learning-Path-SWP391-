@@ -1,6 +1,5 @@
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
-import RouteOutlinedIcon from "@mui/icons-material/RouteOutlined";
 import NewspaperOutlinedIcon from "@mui/icons-material/NewspaperOutlined";
 import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
@@ -21,6 +20,14 @@ export function isAdminCategoriesActive(pathname) {
 
 export function isAdminLevelsActive(pathname) {
   return pathname === "/admin/levels" || pathname.startsWith("/admin/levels/");
+}
+
+export function isAdminNewsActive(pathname) {
+  return pathname === "/admin/news" || pathname.startsWith("/admin/news/");
+}
+
+export function isStudentNewsActive(pathname) {
+  return pathname === "/news" || /^\/news\/\d+/.test(pathname);
 }
 
 export function isMentorQuestionBankActive(pathname) {
@@ -55,16 +62,12 @@ export function getStudentMenuItems(user) {
       disabled: !student,
     },
     {
-      id: "paths",
-      label: "Lộ trình",
-      Icon: RouteOutlinedIcon,
-      disabled: true,
-    },
-    {
-      id: "news",
-      label: "Tin tức",
+      id: 'news',
+      label: 'Tin tức',
+      to: '/news',
       Icon: NewspaperOutlinedIcon,
-      disabled: true,
+      disabled: !student,
+      isActiveMatch: isStudentNewsActive,
     },
   ];
 }
@@ -129,6 +132,14 @@ export function getAdminMenuItems() {
       Icon: LayersOutlinedIcon,
       disabled: false,
       isActiveMatch: isAdminLevelsActive,
+    },
+    {
+      id: "admin-news",
+      label: "Tin tức",
+      to: "/admin/news",
+      Icon: NewspaperOutlinedIcon,
+      disabled: false,
+      isActiveMatch: isAdminNewsActive,
     },
   ];
 }

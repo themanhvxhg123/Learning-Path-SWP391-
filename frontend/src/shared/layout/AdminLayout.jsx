@@ -21,7 +21,7 @@ export default function AdminLayout() {
       >
         <Header
           logoTo="/admin/accounts"
-          profilePath="/profile"
+          profilePath="/admin/profile"
           showMyCoursesButton={false}
         />
         <Sidebar variant="admin" />

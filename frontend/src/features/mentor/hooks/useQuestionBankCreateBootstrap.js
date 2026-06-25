@@ -1,18 +1,21 @@
 /**
  * Bootstrap trang Create Question Bank — URL-driven, an toàn khi F5 / đổi chương.
+ * Dữ liệu khóa học / chương giữ PascalCase như API database.
+ * Draft chỉ ghi khi user bấm "Lưu nháp" (không auto-save).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '@/shared/ui/Toast';
 import {
   TEST_SKILL_LISTENING,
+  consolidateWritingSections,
   createQuestionBankSkillSections,
   getSectionsBySkill,
 } from '@/features/mentor/utils/mentorTestContentUtils';
 import {
   fetchCourseContentOutlineForQB,
   fetchCourseForQB,
-  findQuestionBankByChapter,
+  fetchPathQuestionBank,
 } from '@/features/mentor/services/questionBankService';
 
 const DRAFT_KEY_PREFIX = 'mentor_qb_create_draft';
@@ -35,13 +38,19 @@ function readDraftSections(courseId, chapterId) {
   }
 }
 
+export function buildQuestionBankSectionsSnapshot(sections = []) {
+  return JSON.stringify(consolidateWritingSections(sections));
+}
+
 export function writeQuestionBankCreateDraft(courseId, chapterId, sections) {
   const key = getDraftStorageKey(courseId, chapterId);
-  if (!key) return;
+  if (!key) return false;
   try {
-    sessionStorage.setItem(key, JSON.stringify(sections));
+    sessionStorage.setItem(key, JSON.stringify(consolidateWritingSections(sections)));
+    return true;
   } catch {
-    // quota exceeded — ignore
+    toast.error('Không thể lưu bản nháp. Bộ nhớ trình duyệt có thể đã đầy.');
+    return false;
   }
 }
 
@@ -55,9 +64,25 @@ export function clearQuestionBankCreateDraft(courseId, chapterId) {
   }
 }
 
+/** Xóa mọi draft create QB (gọi khi logout). */
+export function clearAllQuestionBankCreateDrafts() {
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(DRAFT_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // ignore
+  }
+}
+
 function buildInitialSections(courseId, chapterId) {
   const draft = readDraftSections(courseId, chapterId);
-  if (draft?.length) return draft;
+  if (draft?.length) return consolidateWritingSections(draft);
   return createQuestionBankSkillSections();
 }
 
@@ -82,18 +107,16 @@ export default function useQuestionBankCreateBootstrap() {
   const chapterId = searchParams.get('chapterId') ?? '';
 
   const resolvedChapterKeyRef = useRef('');
-  const sectionsRef = useRef(createQuestionBankSkillSections());
   const prevCourseIdRef = useRef('');
 
   const [course, setCourse] = useState(null);
-  const [courseChapters, setCourseChapters] = useState([]);
+  const [coursePaths, setCoursePaths] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState(() => createQuestionBankSkillSections());
   const [activeSkill, setActiveSkill] = useState(TEST_SKILL_LISTENING);
   const [activeSectionId, setActiveSectionId] = useState('');
   const [sectionErrors, setSectionErrors] = useState({});
-
-  sectionsRef.current = sections;
+  const [editorReadyKey, setEditorReadyKey] = useState('');
 
   const applyChapterState = useCallback((targetCourseId, targetChapterId) => {
     const nextSections = buildInitialSections(targetCourseId, targetChapterId);
@@ -101,8 +124,10 @@ export default function useQuestionBankCreateBootstrap() {
     setSectionErrors({});
     setActiveSkill(TEST_SKILL_LISTENING);
     setActiveSectionId(getFirstListeningSectionId(nextSections));
-    resolvedChapterKeyRef.current = getChapterKey(targetCourseId, targetChapterId);
-    sectionsRef.current = nextSections;
+    const chapterKey = getChapterKey(targetCourseId, targetChapterId);
+    resolvedChapterKeyRef.current = chapterKey;
+    setEditorReadyKey(chapterKey);
+    return nextSections;
   }, []);
 
   const resetEmptyEditor = useCallback(() => {
@@ -112,30 +137,31 @@ export default function useQuestionBankCreateBootstrap() {
     setActiveSkill(TEST_SKILL_LISTENING);
     setActiveSectionId(getFirstListeningSectionId(emptySections));
     resolvedChapterKeyRef.current = '';
-    sectionsRef.current = emptySections;
+    setEditorReadyKey('');
+    return emptySections;
   }, []);
 
-  const resolveChapter = useCallback(
-    (targetChapterId, { redirectIfExists = true } = {}) => {
-      if (!courseId || !targetChapterId || courseChapters.length === 0) {
-        return false;
-      }
+  const activateChapter = useCallback(
+    async (targetChapterId) => {
+      if (!courseId || !targetChapterId) return null;
 
-      const bankRes = findQuestionBankByChapter(courseId, targetChapterId);
-      if (bankRes.ok && redirectIfExists) {
-        navigate(`/mentor/question-banks/${bankRes.bank.id}`, { replace: true });
-        return true;
-      }
-
-      const chapter = courseChapters.find(
-        (item) => String(item.chapterId) === String(targetChapterId),
+      const path = coursePaths.find(
+        (item) => String(item.PathId) === String(targetChapterId),
       );
-      if (!chapter) return false;
+      if (!path) return null;
 
-      applyChapterState(courseId, targetChapterId);
-      return true;
+      const existing = await fetchPathQuestionBank(courseId, targetChapterId);
+      if (existing.ok) {
+        toast.info('Chương này đã có ngân hàng câu hỏi.');
+        navigate(
+          `/mentor/question-banks/${existing.bank.BankId ?? existing.bank.id}?courseId=${courseId}&chapterId=${targetChapterId}`,
+        );
+        return null;
+      }
+
+      return applyChapterState(courseId, targetChapterId);
     },
-    [applyChapterState, courseChapters, courseId, navigate],
+    [applyChapterState, courseId, coursePaths, navigate],
   );
 
   useEffect(() => {
@@ -158,7 +184,7 @@ export default function useQuestionBankCreateBootstrap() {
         }
 
         setCourse(courseRes.course);
-        setCourseChapters(outlineRes.ok ? outlineRes.chapters ?? [] : []);
+        setCoursePaths(outlineRes.ok ? outlineRes.chapters ?? [] : []);
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -178,7 +204,7 @@ export default function useQuestionBankCreateBootstrap() {
   }, [courseId, resetEmptyEditor]);
 
   useEffect(() => {
-    if (loading || !courseId || courseChapters.length === 0) return;
+    if (loading || !courseId || coursePaths.length === 0) return;
 
     if (!chapterId) {
       resolvedChapterKeyRef.current = '';
@@ -189,35 +215,15 @@ export default function useQuestionBankCreateBootstrap() {
     const chapterKey = getChapterKey(courseId, chapterId);
     if (resolvedChapterKeyRef.current === chapterKey) return;
 
-    resolveChapter(chapterId);
-  }, [loading, courseId, chapterId, courseChapters, resolveChapter, resetEmptyEditor]);
-
-  useEffect(() => {
-    if (!courseId || !chapterId) return;
-
-    const chapterKey = getChapterKey(courseId, chapterId);
-    if (resolvedChapterKeyRef.current !== chapterKey) return;
-
-    writeQuestionBankCreateDraft(courseId, chapterId, sections);
-  }, [courseId, chapterId, sections]);
+    activateChapter(chapterId);
+  }, [loading, courseId, chapterId, coursePaths, activateChapter, resetEmptyEditor]);
 
   const selectChapter = useCallback(
-    (nextChapterId) => {
-      if (String(nextChapterId) === String(chapterId)) return;
+    async (nextChapterId) => {
+      if (String(nextChapterId) === String(chapterId)) return false;
 
-      if (courseId && chapterId) {
-        writeQuestionBankCreateDraft(courseId, chapterId, sectionsRef.current);
-      }
-
-      const bankRes = findQuestionBankByChapter(courseId, nextChapterId);
-      if (bankRes.ok) {
-        navigate(`/mentor/question-banks/${bankRes.bank.id}`);
-        return;
-      }
-
-      if (courseChapters.length > 0) {
-        resolveChapter(nextChapterId, { redirectIfExists: false });
-      }
+      const nextSections = await activateChapter(nextChapterId);
+      if (!nextSections) return false;
 
       setSearchParams(
         (prev) => {
@@ -228,12 +234,13 @@ export default function useQuestionBankCreateBootstrap() {
         },
         { replace: true },
       );
+      return true;
     },
-    [chapterId, courseChapters, courseId, navigate, resolveChapter, setSearchParams],
+    [activateChapter, chapterId, courseId, setSearchParams],
   );
 
-  const selectedChapter = courseChapters.find(
-    (item) => String(item.chapterId) === String(chapterId),
+  const selectedPath = coursePaths.find(
+    (item) => String(item.PathId) === String(chapterId),
   );
 
   const workspaceKey = getChapterKey(courseId, chapterId) || `course-${courseId}-none`;
@@ -242,9 +249,10 @@ export default function useQuestionBankCreateBootstrap() {
     courseId,
     chapterId,
     course,
-    courseChapters,
+    coursePaths,
     loading,
     workspaceKey,
+    editorReadyKey,
     sections,
     setSections,
     sectionErrors,
@@ -253,9 +261,9 @@ export default function useQuestionBankCreateBootstrap() {
     setActiveSkill,
     activeSectionId,
     setActiveSectionId,
-    selectedChapter,
-    hasChapters: courseChapters.length > 0,
-    canUseGenerator: Boolean(chapterId) && courseChapters.length > 0 && !loading,
+    selectedPath,
+    hasPaths: coursePaths.length > 0,
+    canUseGenerator: Boolean(chapterId) && coursePaths.length > 0 && !loading,
     selectChapter,
   };
 }

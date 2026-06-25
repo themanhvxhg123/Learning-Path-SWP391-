@@ -24,7 +24,7 @@ const MIN_ZOOM = 1;        // Mức thu nhỏ tối đa (vừa vặn khung)
 const MAX_ZOOM = 3;        // Mức phóng to tối đa (gấp 3 lần)
 const ZOOM_STEP = 0.08;    // Tốc độ zoom mỗi lần cuộn chuột
 const PRIMARY = "#0891B2"; // Màu sắc chủ đạo của nút bấm
-export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave }) {
+export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave, initialFrame = "" }) {
     // ==========================================
     // 2. KHAI BÁO TRẠNG THÁI (STATE) & REF
     // ==========================================
@@ -32,6 +32,29 @@ export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave
     const [offset, setOffset] = useState({ x: 0, y: 0 });      // Tọa độ kéo ảnh (x, y)
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 }); // Kích thước gốc của ảnh
     const [saving, setSaving] = useState(false);               // Trạng thái đang lưu (loading)
+    
+    // --- THÊM STATE CHO FRAME ---
+    const [selectedFrame, setSelectedFrame] = useState(initialFrame); 
+    const FRAME_LIST = [
+        "", // Lựa chọn "Không dùng khung"
+        "/frames/frame_test1.png", 
+        "/frames/frame_test2.png", 
+    ];
+
+    // --- THÊM STATE CHO ẢNH LÊN MỚI ---
+    const [localImageSrc, setLocalImageSrc] = useState(imageSrc);
+    const fileInputRef = useRef(null);
+
+    useEffect(() => {
+        setLocalImageSrc(imageSrc);
+    }, [imageSrc]);
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setLocalImageSrc(URL.createObjectURL(file));
+        e.target.value = null;
+    };
 
     // Các Ref dùng để xử lý logic kéo thả mượt mà không làm re-render toàn bộ
     const [dragging, setDragging] = useState(false);
@@ -54,17 +77,25 @@ export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave
     // ==========================================
     // 4. HIỆU ỨNG VÒNG ĐỜI (USE EFFECT)
     // ==========================================
+
+    // Cập nhật lại khung cũ nếu user mở popup
+    useEffect(() => {
+        if (open) {
+            setSelectedFrame(initialFrame);
+        }
+    }, [open, initialFrame]);
+
     // Load kích thước thật của ảnh khi người dùng vừa chọn file mới
     useEffect(() => {
-        if (!open || !imageSrc) return;
+        if (!open || !localImageSrc) return;
         const image = new Image();
         image.onload = () => {
             setImageSize({ width: image.naturalWidth, height: image.naturalHeight });
             setZoom(MIN_ZOOM);         // Reset zoom về ban đầu
             setOffset({ x: 0, y: 0 }); // Đưa ảnh về giữa
         };
-        image.src = imageSrc;
-    }, [open, imageSrc]);
+        image.src = localImageSrc;
+    }, [open, localImageSrc]);
     // Cập nhật lại tọa độ nếu người dùng zoom (tránh việc ảnh bị lọt thỏm)
     useEffect(() => {
         if (!imageSize.width) return;
@@ -119,12 +150,12 @@ export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave
     // 6. HÀM LƯU ẢNH (SAVE)
     // ==========================================
     const handleSave = async () => {
-        if (!imageSrc) return;
+        if (!localImageSrc) return;
         setSaving(true);
 
         try {
             // Gọi hàm cắt ảnh và chuyển thành chuỗi Base64 (size ảnh xuất ra là 400x400)
-            const croppedBase64 = await getCroppedImageDataUrl(imageSrc, {
+            const croppedBase64 = await getCroppedImageDataUrl(localImageSrc, {
                 cropWidth: CROP_SIZE,
                 cropHeight: CROP_SIZE,
                 zoom,
@@ -137,8 +168,8 @@ export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave
                 toast.error(validationError);
                 return;
             }
-            // Trả file Base64 về cho Component cha (ProfilePage)
-            onSave(croppedBase64);
+            // Trả file Base64 VÀ Frame URL về cho Component cha (ProfilePage)
+            onSave({ faceBase64: croppedBase64, frameUrl: selectedFrame });
         } finally {
             setSaving(false);
         }
@@ -156,31 +187,31 @@ export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     Kéo ảnh để chọn vùng hiển thị. Cuộn chuột để phóng to/thu nhỏ.
                 </Typography>
-                {/* Khung cắt chính */}
-                <Box
-                    ref={cropBoxRef}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerUp}
-                    sx={{
-                        position: 'relative',
-                        width: CROP_SIZE,
-                        height: CROP_SIZE,
-                        mx: 'auto',
-                        overflow: 'hidden',
-                        borderRadius: '50%', // Bắt buộc 50% để tạo khung tròn cho Avatar
-                        bgcolor: '#0F172A',
-                        cursor: dragging ? 'grabbing' : 'grab',
-                        touchAction: 'none',
-                        userSelect: 'none',
-                    }}
-                >
+                {/* KHU VỰC CHỨA CẮT ẢNH & KHUNG */}
+                <Box sx={{ position: 'relative', width: CROP_SIZE, height: CROP_SIZE, mx: 'auto', mt: 3, mb: 4 }}>
+                    {/* Khung cắt chính (CÓ overflow hidden để cắt tròn ảnh mặt) */}
+                    <Box
+                        ref={cropBoxRef}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerUp}
+                        sx={{
+                            position: 'absolute',
+                            inset: 0,
+                            overflow: 'hidden',
+                            borderRadius: '50%', // Bắt buộc 50% để tạo khung tròn cho Avatar
+                            bgcolor: '#0F172A',
+                            cursor: dragging ? 'grabbing' : 'grab',
+                            touchAction: 'none',
+                            userSelect: 'none',
+                        }}
+                    >
                     {/* Lớp hiển thị ảnh bị kéo */}
-                    {imageSrc && imageSize.width > 0 && (
+                    {localImageSrc && imageSize.width > 0 && (
                         <Box
                             component="img"
-                            src={imageSrc}
+                            src={localImageSrc}
                             alt=""
                             draggable={false}
                             sx={{
@@ -205,6 +236,72 @@ export default function ProfileImageCropDialog({ open, imageSrc, onClose, onSave
                             pointerEvents: 'none',
                         }}
                     />
+                    </Box> {/* Hết Box cắt ảnh */}
+
+                    {/* Lớp Overlay hiển thị Khung (NẰM NGOÀI OVERFLOW HIDDEN) */}
+                    {selectedFrame && (
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                width: '100%',
+                                height: '100%',
+                                // Phóng to Khung lên 1.315 lần để cái lỗ 380px vừa khít với cục 300px
+                                transform: 'translate(-50%, -50%) scale(1.315)',
+                                pointerEvents: 'none',
+                                zIndex: 10,
+                            }}
+                        >
+                            <img src={selectedFrame} alt="Frame" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        </Box>
+                    )}
+                </Box> {/* Hết KHU VỰC CHỨA CẮT ẢNH & KHUNG */}
+
+                {/* --- NÚT ĐỔI ẢNH ĐẠI DIỆN --- */}
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                    <input type="file" accept="image/*" hidden ref={fileInputRef} onChange={handleFileChange} />
+                    <AppButton variant="text" size="small" onClick={() => fileInputRef.current?.click()} sx={{ fontWeight: 600 }}>
+                        + Tải lên ảnh mới
+                    </AppButton>
+                </Box>
+
+                {/* --- PHẦN 2: CHỌN KHUNG --- */}
+                <Typography variant="subtitle2" sx={{ mt: 3, mb: 1.5, textAlign: 'center', fontWeight: 600 }}>
+                    Chọn Khung Trang Trí
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                    {FRAME_LIST.map((frame, index) => (
+                        <Box
+                            key={index}
+                            onClick={() => setSelectedFrame(frame)}
+                            sx={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: '50%',
+                                border: selectedFrame === frame ? '3px solid #0891B2' : '1px solid #E2E8F0',
+                                cursor: 'pointer',
+                                backgroundImage: frame ? `url(${frame})` : 'none',
+                                backgroundSize: 'cover',
+                                backgroundColor: frame ? 'transparent' : '#F1F5F9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s',
+                                "&:hover": { borderColor: '#0891B2', transform: 'scale(1.05)' }
+                            }}
+                        >
+                            {/* Vẽ hình tròn gạch chéo đỏ cho nút Bỏ khung */}
+                            {!frame && (
+                                <Box sx={{
+                                    width: '100%', 
+                                    height: '100%', 
+                                    borderRadius: '50%', 
+                                    background: 'linear-gradient(45deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)'
+                                }} />
+                            )}
+                        </Box>
+                    ))}
                 </Box>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>

@@ -8,9 +8,12 @@ import {
   filterLearningMaterials,
   formatFileSize,
   getDocFileTypeLabel,
+  getNodeMaterials,
+  getPathNodes,
   isHtmlContentEmpty,
   isLearningMaterial,
   MATERIAL_TYPE_LABELS,
+  normalizeMaterialForDisplay,
   validateCourseContent,
   withNormalizedOrders,
 } from './mentorCourseContentUtils';
@@ -24,52 +27,144 @@ import {
 
 export { MATERIAL_TYPE_LABELS, countMaterialsInPath };
 
+function stripHtmlContent(html) {
+  return extractPlainTextFromHtml(html);
+}
+
+function truncatePreview(text, max = 80) {
+  const value = String(text ?? '').trim();
+  if (!value) return '';
+  if (value.length <= max) return value;
+
+  const slice = value.slice(0, max);
+  const lastSpace = slice.lastIndexOf(' ');
+  const truncated = lastSpace > max * 0.55 ? slice.slice(0, lastSpace) : slice;
+  return `${truncated.trim()}...`;
+}
+
+function resolveDocSourceType(material) {
+  if (material.SourceType === DOC_SOURCE_LINK) return DOC_SOURCE_LINK;
+  if (material.SourceType === DOC_SOURCE_UPLOAD) return DOC_SOURCE_UPLOAD;
+  if (material.FileName || material.FileSize || material.File) return DOC_SOURCE_UPLOAD;
+  return DOC_SOURCE_UPLOAD;
+}
+
+function getTextMaterialPreview(material, max = 80) {
+  const plainText = stripHtmlContent(material.Content);
+  if (plainText) {
+    if (plainText.length <= max) return plainText;
+    return truncatePreview(plainText, max);
+  }
+
+  const fileName = String(material.FileName ?? '').trim();
+  if (fileName) return `File: ${fileName}`;
+
+  const url = String(material.MaterialUrl ?? '').trim();
+  if (url) return `Link: ${truncatePreview(url, 120)}`;
+
+  return 'Chưa có nội dung';
+}
+
 export const REVIEW_OUTLINE_TYPE_LABELS = { ...MATERIAL_TYPE_LABELS };
 
-export function getMaterialReviewDetailSummary(material) {
-  if (!material?.MaterialType) return '';
+function resolveMaterialLinkLabel(material, typeLabel = 'Học liệu') {
+  const fileName = String(material.FileName ?? '').trim();
+  if (fileName) return fileName;
 
-  switch (material.MaterialType) {
+  const title = String(material.Title ?? '').trim();
+  if (title) return title;
+
+  return typeLabel;
+}
+
+/** Chi tiết học liệu cho outline tab Nội dung — link hiển thị FileName/Title thay vì URL. */
+export function getMaterialOutlineDetail(material) {
+  const normalized = normalizeMaterialForDisplay(material);
+  if (!normalized.MaterialType) return null;
+
+  const typeLabel = REVIEW_OUTLINE_TYPE_LABELS[normalized.MaterialType] ?? 'Học liệu';
+  const url = String(normalized.MaterialUrl ?? '').trim();
+  const linkLabel = resolveMaterialLinkLabel(normalized, typeLabel);
+
+  switch (normalized.MaterialType) {
     case 'VIDEO': {
-      const hasUrl = Boolean(String(material.MaterialUrl ?? '').trim());
-      const hasEmbed = Boolean(String(material.EmbedUrl ?? '').trim());
-      if (hasUrl) return `Link: ${truncatePreview(material.MaterialUrl, 120)}`;
+      if (url) return { type: 'link', href: url, label: linkLabel };
+      if (String(normalized.EmbedUrl ?? '').trim()) {
+        return { type: 'text', text: 'Nguồn: Mã nhúng video' };
+      }
+      return { type: 'text', text: 'Chưa có link hoặc mã nhúng' };
+    }
+    case 'TEXT': {
+      const plainText = stripHtmlContent(normalized.Content);
+      if (plainText) {
+        const preview = plainText.length <= 80 ? plainText : truncatePreview(plainText, 80);
+        return { type: 'text', text: preview };
+      }
+      if (url) return { type: 'link', href: url, label: linkLabel };
+      return { type: 'text', text: 'Chưa có nội dung' };
+    }
+    case 'DOC': {
+      if (url) return { type: 'link', href: url, label: linkLabel };
+
+      const fileName = String(normalized.FileName ?? '').trim();
+      if (fileName) {
+        const docTypeLabel = getDocFileTypeLabel(fileName);
+        const sizeLabel = normalized.FileSize
+          ? formatFileSize(normalized.FileSize)
+          : null;
+        return {
+          type: 'text',
+          text: sizeLabel ? `${docTypeLabel} · ${fileName} · ${sizeLabel}` : `${docTypeLabel} · ${fileName}`,
+        };
+      }
+      return { type: 'text', text: 'Chưa có file tài liệu' };
+    }
+    default:
+      return null;
+  }
+}
+
+export function getMaterialReviewDetailSummary(material) {
+  const normalized = normalizeMaterialForDisplay(material);
+  if (!normalized.MaterialType) return '';
+
+  switch (normalized.MaterialType) {
+    case 'VIDEO': {
+      const hasUrl = Boolean(String(normalized.MaterialUrl ?? '').trim());
+      const hasEmbed = Boolean(String(normalized.EmbedUrl ?? '').trim());
+      if (hasUrl) return `Link: ${truncatePreview(normalized.MaterialUrl, 120)}`;
       if (hasEmbed) return 'Nguồn: Mã nhúng video';
       return 'Chưa có link hoặc mã nhúng';
     }
     case 'TEXT': {
-      const plainText = stripHtmlContent(material.Content);
-      if (!plainText) return 'Chưa có nội dung';
-      if (plainText.length <= 80) return plainText;
-      return truncatePreview(plainText, 80);
+      return getTextMaterialPreview(normalized);
     }
     case 'DOC': {
-      const sourceType =
-        material.SourceType === DOC_SOURCE_LINK ? DOC_SOURCE_LINK : DOC_SOURCE_UPLOAD;
+      const sourceType = resolveDocSourceType(normalized);
       if (sourceType === DOC_SOURCE_LINK) {
-        const link = String(material.MaterialUrl ?? '').trim();
+        const link = String(normalized.MaterialUrl ?? '').trim();
         return link ? `Link: ${truncatePreview(link, 120)}` : 'Chưa có link tài liệu';
       }
-      const fileName = material.FileName || material.File?.name;
+      const fileName = normalized.FileName || normalized.File?.name;
       if (!fileName) return 'Chưa có file tài liệu';
       const typeLabel = getDocFileTypeLabel(fileName);
-      const sizeLabel = material.FileSize || material.File?.size
-        ? formatFileSize(material.FileSize ?? material.File?.size)
+      const sizeLabel = normalized.FileSize || normalized.File?.size
+        ? formatFileSize(normalized.FileSize ?? normalized.File?.size)
         : null;
       return sizeLabel ? `${typeLabel} · ${fileName} · ${sizeLabel}` : `${typeLabel} · ${fileName}`;
     }
     case 'TEST': {
-      if (material.QuestionBankTitle) {
-        const summary = computeMaterialTestSummary(material.Sections ?? []);
+      if (normalized.QuestionBankTitle) {
+        const summary = computeMaterialTestSummary(normalized.Sections ?? []);
         const scoringLabel =
-          getEffectiveScoringMode(material) === SCORING_MODE_MANUAL
+          getEffectiveScoringMode(normalized) === SCORING_MODE_MANUAL
             ? 'Chấm tay'
             : 'Tự động';
-        return `Ngân hàng: ${material.QuestionBankTitle} · ${summary.questionCount} câu · ${scoringLabel}`;
+        return `Ngân hàng: ${normalized.QuestionBankTitle} · ${summary.questionCount} câu · ${scoringLabel}`;
       }
-      const summary = computeMaterialTestSummary(material.Sections ?? []);
+      const summary = computeMaterialTestSummary(normalized.Sections ?? []);
       const scoringLabel =
-        getEffectiveScoringMode(material) === SCORING_MODE_MANUAL
+        getEffectiveScoringMode(normalized) === SCORING_MODE_MANUAL
           ? 'Nhập điểm thủ công'
           : 'Tự chia đều';
       return `${summary.sectionCount} phần · ${summary.questionCount} câu hỏi · ${DEFAULT_TEST_TOTAL_SCORE} điểm · ${scoringLabel}`;
@@ -84,7 +179,7 @@ export function countChapters(paths = []) {
 }
 
 export function countLessons(paths = []) {
-  return (paths ?? []).reduce((sum, path) => sum + (path.nodes ?? []).length, 0);
+  return (paths ?? []).reduce((sum, path) => sum + getPathNodes(path).length, 0);
 }
 
 export function countMaterials(paths = []) {
@@ -95,8 +190,8 @@ export function countMaterialsByType(paths = []) {
   const counts = { VIDEO: 0, TEXT: 0, DOC: 0 };
 
   (paths ?? []).forEach((path) => {
-    (path.nodes ?? []).forEach((node) => {
-      filterLearningMaterials(node.materials).forEach((material) => {
+    getPathNodes(path).forEach((node) => {
+      filterLearningMaterials(getNodeMaterials(node)).forEach((material) => {
         const type = material.MaterialType;
         if (type in counts) counts[type] += 1;
       });
@@ -114,8 +209,8 @@ export function countTestQuestions(paths = []) {
   let total = 0;
 
   (paths ?? []).forEach((path) => {
-    (path.nodes ?? []).forEach((node) => {
-      (node.materials ?? []).forEach((material) => {
+    getPathNodes(path).forEach((node) => {
+      getNodeMaterials(node).forEach((material) => {
         if (material.MaterialType !== 'TEST') return;
         const summary = computeMaterialTestSummary(material.Sections ?? []);
         total += summary.questionCount;
@@ -124,21 +219,6 @@ export function countTestQuestions(paths = []) {
   });
 
   return total;
-}
-
-function stripHtmlContent(html) {
-  return extractPlainTextFromHtml(html);
-}
-
-function truncatePreview(text, max = 80) {
-  const value = String(text ?? '').trim();
-  if (!value) return '';
-  if (value.length <= max) return value;
-
-  const slice = value.slice(0, max);
-  const lastSpace = slice.lastIndexOf(' ');
-  const truncated = lastSpace > max * 0.55 ? slice.slice(0, lastSpace) : slice;
-  return `${truncated.trim()}...`;
 }
 
 function buildMaterialReviewItem(path, pathIndex, node, nodeIndex, material, type, index) {
@@ -154,8 +234,8 @@ function collectMaterialsByType(paths = [], materialType, mapDetail) {
   const items = [];
 
   (paths ?? []).forEach((path, pathIndex) => {
-    (path.nodes ?? []).forEach((node, nodeIndex) => {
-      (node.materials ?? []).forEach((material) => {
+    getPathNodes(path).forEach((node, nodeIndex) => {
+      getNodeMaterials(node).forEach((material) => {
         if (material.MaterialType !== materialType) return;
         items.push({
           ...buildMaterialReviewItem(
@@ -188,24 +268,12 @@ export function collectVideoMaterials(paths = []) {
 }
 
 export function collectTextMaterials(paths = []) {
-  const TEXT_PREVIEW_MAX = 80;
-
-  return collectMaterialsByType(paths, 'TEXT', (material) => {
-    const plainText = stripHtmlContent(material.Content);
-    if (!plainText) return 'Chưa có nội dung';
-
-    if (plainText.length <= TEXT_PREVIEW_MAX) {
-      return plainText;
-    }
-
-    return truncatePreview(plainText, TEXT_PREVIEW_MAX);
-  });
+  return collectMaterialsByType(paths, 'TEXT', (material) => getTextMaterialPreview(material, 80));
 }
 
 export function collectDocMaterials(paths = []) {
   return collectMaterialsByType(paths, 'DOC', (material) => {
-    const sourceType =
-      material.SourceType === DOC_SOURCE_LINK ? DOC_SOURCE_LINK : DOC_SOURCE_UPLOAD;
+    const sourceType = resolveDocSourceType(material);
 
     if (sourceType === DOC_SOURCE_LINK) {
       const link = String(material.MaterialUrl ?? '').trim();

@@ -1,5 +1,5 @@
 export const ADMIN_ACCOUNT_TABLE_GRID_COLUMNS =
-  'minmax(200px, 1.4fr) minmax(180px, 1fr) minmax(90px, 0.55fr) minmax(110px, 0.65fr) minmax(100px, 0.55fr) minmax(140px, 0.75fr) minmax(48px, auto)';
+  'minmax(200px, 1.5fr) minmax(180px, 1.2fr) minmax(92px, auto) minmax(128px, auto) minmax(108px, auto) 72px';
 
 export const ADMIN_ACCOUNT_TABLE_HEADERS = [
   'Người dùng',
@@ -7,9 +7,25 @@ export const ADMIN_ACCOUNT_TABLE_HEADERS = [
   'Vai trò',
   'Trạng thái',
   'Ngày tạo',
-  'Lần đăng nhập gần nhất',
   'Hành động',
 ];
+
+/** Layout dùng chung cho header + row — tránh lệch cột. */
+export const ADMIN_ACCOUNT_TABLE_LAYOUT_SX = {
+  gridTemplateColumns: ADMIN_ACCOUNT_TABLE_GRID_COLUMNS,
+  columnGap: 2,
+  px: 2.25,
+  alignItems: 'center',
+  width: '100%',
+  boxSizing: 'border-box',
+};
+
+export function getAdminAccountHeaderCellSx(index, total = ADMIN_ACCOUNT_TABLE_HEADERS.length) {
+  if (index === total - 1) {
+    return { textAlign: 'right', justifySelf: 'end' };
+  }
+  return { minWidth: 0, justifySelf: 'start' };
+}
 
 export const ADMIN_ACCOUNT_ROLE_LABELS = {
   Admin: 'Admin',

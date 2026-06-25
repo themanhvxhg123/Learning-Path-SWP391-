@@ -1,12 +1,12 @@
 /**
- * Chuyển / thêm bài (Nghe, Đọc) hoặc nhóm câu hỏi (Từ vựng–Ngữ pháp).
+ * Chuyển / thêm bài (Nghe, Đọc). Trắc nghiệm dùng list phẳng — không hiển thị nav bài.
  */
 import { Box, Typography, alpha } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { MUTED, PRIMARY, TEXT } from '@/features/mentor/components/course/mentorCourseCreateStyles';
 import {
   getQuestionBankSectionTabLabel,
-  isQuestionBankWritingSkill,
+  supportsQuestionBankMultiSection,
 } from '@/features/mentor/utils/mentorTestContentUtils';
 
 function BaiTab({ label, selected, disabled, accentColor, onClick }) {
@@ -55,9 +55,9 @@ export default function MentorQuestionBankBaiNav({
   onSelect,
   onAdd,
 }) {
-  const isWritingSkill = isQuestionBankWritingSkill(activeSkill);
-  const addLabel = isWritingSkill ? 'Thêm nhóm câu hỏi' : 'Thêm bài';
-  const countLabel = isWritingSkill ? 'nhóm' : 'bài';
+  if (!supportsQuestionBankMultiSection(activeSkill)) {
+    return null;
+  }
 
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mb: 2 }}>
@@ -95,11 +95,11 @@ export default function MentorQuestionBankBaiNav({
         }}
       >
         <AddRoundedIcon sx={{ fontSize: 15 }} />
-        {addLabel}
+        Thêm bài
       </Box>
       {skillSections.length > 0 && (
         <Typography sx={{ fontSize: 11, color: MUTED, ml: { xs: 0, sm: 0.25 } }}>
-          {skillSections.length} {countLabel}
+          {skillSections.length} bài
         </Typography>
       )}
     </Box>

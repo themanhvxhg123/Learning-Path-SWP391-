@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AppButton from '@/shared/ui/AppButton';
 import { toast } from '@/shared/ui/Toast';
 import Loading from '@/shared/ui/Loading';
@@ -19,6 +19,8 @@ import MentorQuestionBankSkillNav from '@/features/mentor/components/questionBan
 import MentorQuestionBankBuilderPanel from '@/features/mentor/components/questionBank/MentorQuestionBankBuilderPanel';
 import MentorQuestionBankDetailHeader from '@/features/mentor/components/questionBank/MentorQuestionBankDetailHeader';
 import MentorQuestionBankRightRail from '@/features/mentor/components/questionBank/MentorQuestionBankRightRail';
+import MentorQuestionBankPathsView from '@/features/mentor/components/questionBank/MentorQuestionBankPathsView';
+import MentorChapterQuestionListView from '@/features/mentor/components/questionBank/MentorChapterQuestionListView';
 import MentorChapterQuizSetupDialog from '@/features/mentor/components/course/MentorChapterQuizSetupDialog';
 import {
   QUIZ_SETUP_SCOPE_CHAPTER,
@@ -27,7 +29,6 @@ import {
 import useQuestionBankDetailBootstrap from '@/features/mentor/hooks/useQuestionBankDetailBootstrap';
 import { PRIMARY } from '@/features/mentor/components/course/mentorCourseCreateStyles';
 import { HEADER_HEIGHT } from '@/shared/layout/MainLayout';
-import { isMentorCoursePublished } from '@/features/mentor/utils/mentorCourseUtils';
 import {
   SCORING_MODE_AUTO,
   buildQuestionSnapshotMap,
@@ -39,9 +40,12 @@ import {
   getFilledQuestionCount,
   getNonEmptyQuestionBankSections,
   getQuestionBankSectionNameFallback,
+  normalizeQuestionBankSectionForSave,
   getSectionBaiNumber,
   getSectionsBySkill,
+  consolidateWritingSections,
   scrollToQuestionBankItem,
+  supportsQuestionBankMultiSection,
   validatePublishedQuestionBankIntegrity,
   validateTestMaterial,
 } from '@/features/mentor/utils/mentorTestContentUtils';
@@ -51,27 +55,34 @@ const PUBLISHED_COURSE_QB_HINT =
   'Khóa học đã xuất bản: chỉ thêm câu hỏi mới, không sửa/xóa câu hỏi cũ. Có thể tắt "Dùng cho quiz" để ẩn câu cũ khỏi quiz/test mới — lịch sử học viên không bị ảnh hưởng.';
 
 function mapSectionsForSave(sourceSections) {
-  return sourceSections.map((section) => ({
-    ...section,
-    DisplayName:
-      String(section.DisplayName ?? '').trim() ||
-      getQuestionBankSectionNameFallback(section, sourceSections),
-  }));
+  return sourceSections.map((section) =>
+    normalizeQuestionBankSectionForSave({
+      ...section,
+      DisplayName:
+        String(section.DisplayName ?? '').trim() ||
+        getQuestionBankSectionNameFallback(section, sourceSections),
+    }),
+  );
 }
 
 export default function MentorQuestionBankDetailPage() {
   const navigate = useNavigate();
+  const { questionBankId } = useParams();
+  const [searchParams] = useSearchParams();
+  const isEditorMode = searchParams.get('mode') === 'editor';
   const [submitting, setSubmitting] = useState(false);
   const [quizSetupTarget, setQuizSetupTarget] = useState(null);
 
   const {
     loading,
     notFound,
+    isPathListMode,
     bank,
+    bankPaths,
     setBank,
     course,
-    courseChapters,
-    chaptersLoading,
+    coursePaths,
+    pathsLoading,
     sections,
     setSections,
     sectionErrors,
@@ -84,10 +95,13 @@ export default function MentorQuestionBankDetailPage() {
     setPersistedQuestionIds,
     questionSnapshotRef,
     workspaceKey,
+    openPath,
+    backToPathList,
     selectChapter,
+    reloadBank,
   } = useQuestionBankDetailBootstrap();
 
-  const coursePublished = isMentorCoursePublished(course);
+  const coursePublished = course?.IsPublished === true || course?.IsPublished === 1;
 
   const questionCount = useMemo(() => getFilledQuestionCount(sections), [sections]);
   const activeQuestionCount = useMemo(() => getActiveQuestionCount(sections), [sections]);
@@ -114,7 +128,8 @@ export default function MentorQuestionBankDetailPage() {
     return getSectionBaiNumber(activeSection, sections) - 1;
   }, [activeSection, sections]);
 
-  const canDeleteActiveSection = skillSections.length > 1;
+  const canDeleteActiveSection =
+    supportsQuestionBankMultiSection(activeSkill) && skillSections.length > 1;
 
   useEffect(() => {
     if (!activeSection && skillSections[0]) {
@@ -131,7 +146,7 @@ export default function MentorQuestionBankDetailPage() {
 
   const handleDeleteSection = (tempId) => {
     const section = sections.find((item) => item.tempId === tempId);
-    if (!section) return;
+    if (!section || !supportsQuestionBankMultiSection(section.SkillType)) return;
 
     const sameSkillSections = getSectionsBySkill(sections, section.SkillType);
     if (sameSkillSections.length <= 1) return;
@@ -172,6 +187,7 @@ export default function MentorQuestionBankDetailPage() {
   };
 
   const handleAddBai = () => {
+    if (!supportsQuestionBankMultiSection(activeSkill)) return;
     const newSection = createQuestionBankSection(activeSkill);
     setSections((prev) => [...prev, newSection]);
     setActiveSectionId(newSection.tempId);
@@ -229,7 +245,9 @@ export default function MentorQuestionBankDetailPage() {
     setSubmitting(true);
     try {
       const bankTitle = bank.title?.trim() || bank.chapterTitle?.trim() || '';
-      const sectionsPayload = mapSectionsForSave(getNonEmptyQuestionBankSections(sections));
+      const sectionsPayload = mapSectionsForSave(
+        getNonEmptyQuestionBankSections(consolidateWritingSections(sections)),
+      );
 
       const res = await updateQuestionBank(bank.id, {
         title: bankTitle,
@@ -256,26 +274,24 @@ export default function MentorQuestionBankDetailPage() {
   };
 
   const footerActions = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, width: '100%' }}>
-      <AppButton
-        loading={submitting}
-        startIcon={<SaveOutlinedIcon />}
-        onClick={handleSave}
-        fullWidth
-        sx={{
-          height: 44,
-          fontSize: 14,
-          fontWeight: 700,
-          borderRadius: '999px',
-          bgcolor: PRIMARY,
-          color: '#fff',
-          boxShadow: 'none',
-          '&:hover': { bgcolor: '#0E7490', boxShadow: 'none' },
-        }}
-      >
-        Lưu thay đổi
-      </AppButton>
-    </Box>
+    <AppButton
+      loading={submitting}
+      startIcon={<SaveOutlinedIcon sx={{ fontSize: 16 }} />}
+      onClick={handleSave}
+      sx={{
+        height: 34,
+        px: 1.75,
+        fontSize: 12,
+        fontWeight: 600,
+        borderRadius: '999px',
+        bgcolor: PRIMARY,
+        color: '#fff',
+        boxShadow: 'none',
+        '&:hover': { bgcolor: '#0E7490', boxShadow: 'none' },
+      }}
+    >
+      Lưu thay đổi
+    </AppButton>
   );
 
   const openQuizSetupForBank = () => {
@@ -286,19 +302,19 @@ export default function MentorQuestionBankDetailPage() {
       chapterTitle: bank.chapterTitle,
       chapterIndex: Math.max(
         0,
-        courseChapters.findIndex(
-          (chapter) => String(chapter.chapterId) === String(bank.chapterId),
+        coursePaths.findIndex(
+          (path) => String(path.PathId) === String(bank.chapterId),
         ),
       ),
     });
   };
 
-  const openQuizSetupForChapter = (chapter, chapterIndex) => {
+  const openQuizSetupForChapter = (path, pathIndex) => {
     setQuizSetupTarget({
       scope: QUIZ_SETUP_SCOPE_CHAPTER,
-      chapterId: chapter.chapterId,
-      chapterTitle: chapter.chapterTitle,
-      chapterIndex,
+      chapterId: path.PathId,
+      chapterTitle: path.PathName,
+      chapterIndex: pathIndex,
     });
   };
 
@@ -307,6 +323,16 @@ export default function MentorQuestionBankDetailPage() {
   };
 
   const backToCourseQuestions = () => {
+    if (isEditorMode && bank?.courseId && bank?.chapterId) {
+      navigate(
+        `/mentor/question-banks/${questionBankId}?courseId=${bank.courseId}&chapterId=${bank.chapterId}`,
+      );
+      return;
+    }
+    if (!isPathListMode && bank?.courseId) {
+      backToPathList();
+      return;
+    }
     if (bank?.courseId) {
       navigate(`/mentor/courses/${bank.courseId}/questions`);
       return;
@@ -317,7 +343,7 @@ export default function MentorQuestionBankDetailPage() {
   if (loading) {
     return (
       <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}>
-        <Loading message="Đang tải ngân hàng câu hỏi..." />
+        <Loading message={isPathListMode ? 'Đang tải danh sách chương...' : 'Đang tải ngân hàng câu hỏi...'} />
       </Box>
     );
   }
@@ -346,15 +372,62 @@ export default function MentorQuestionBankDetailPage() {
     );
   }
 
+  if (isPathListMode) {
+    return (
+      <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto', py: 2 }}>
+        <MentorQuestionBankPathsView
+          bank={bank}
+          paths={bankPaths}
+          courseName={course?.CourseName ?? bank.courseTitle}
+          updatedAt={bank.updatedAt}
+          onOpenPath={openPath}
+          onBack={() => navigate('/mentor/question-banks')}
+          onCreatePath={
+            bank.courseId
+              ? () => navigate(`/mentor/question-banks/create?courseId=${bank.courseId}`)
+              : undefined
+          }
+        />
+      </Box>
+    );
+  }
+
+  if (!isEditorMode) {
+    return (
+      <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto', py: 2 }}>
+        <MentorChapterQuestionListView
+          bankId={questionBankId}
+          courseId={bank.courseId}
+          chapterId={bank.chapterId}
+          chapterTitle={bank.chapterTitle}
+          courseName={course?.CourseName ?? bank.courseTitle}
+          questions={bank.questionList ?? []}
+          onBack={backToPathList}
+          onReload={reloadBank}
+          onEditQuestion={(question) =>
+            navigate(
+              `/mentor/question-banks/${questionBankId}?courseId=${bank.courseId}&chapterId=${bank.chapterId}&mode=editor&questionId=${question.QuestionId}`,
+            )
+          }
+          onAddQuestion={() =>
+            navigate(`/mentor/question-banks/create?courseId=${bank.courseId}&chapterId=${bank.chapterId}`)
+          }
+        />
+      </Box>
+    );
+  }
+
   const bankTitle = bank.title?.trim() || bank.chapterTitle?.trim() || 'Ngân hàng câu hỏi';
-  const courseCategory = [course?.categoryName, course?.levelName].filter(Boolean).join(' · ');
+  const courseCategory = [course?.CategoryDisplayName, course?.LevelDisplayName]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <Box sx={{ width: '100%', maxWidth: { xs: '100%', lg: 1520 }, mx: 'auto' }}>
       <MentorQuestionBankDetailHeader
         bankTitle={bankTitle}
         courseId={bank.courseId}
-        courseName={bank.courseTitle || course?.courseName}
+        courseName={bank.courseTitle || course?.CourseName}
         courseCategory={courseCategory}
         chapterTitle={bank.chapterTitle}
         coursePublished={coursePublished}
@@ -373,15 +446,15 @@ export default function MentorQuestionBankDetailPage() {
         onClose={() => setQuizSetupTarget(null)}
         scope={quizSetupTarget?.scope ?? QUIZ_SETUP_SCOPE_CHAPTER}
         courseId={bank.courseId}
-        courseTitle={bank.courseTitle || course?.courseName}
+        courseTitle={bank.courseTitle || course?.CourseName}
         chapterId={quizSetupTarget?.chapterId ?? bank.chapterId}
         chapterTitle={quizSetupTarget?.chapterTitle ?? bank.chapterTitle}
         chapterIndex={
           quizSetupTarget?.chapterIndex ??
           Math.max(
             0,
-            courseChapters.findIndex(
-              (chapter) => String(chapter.chapterId) === String(bank.chapterId),
+            coursePaths.findIndex(
+              (path) => String(path.PathId) === String(bank.chapterId),
             ),
           )
         }
@@ -450,26 +523,22 @@ export default function MentorQuestionBankDetailPage() {
             activeSkill={activeSkill}
             activeSectionId={activeSectionId}
             onNavigateToItem={handleOutlineNavigate}
-            courseName={bank.courseTitle || course?.courseName}
+            courseName={bank.courseTitle || course?.CourseName}
             courseCategory={courseCategory}
             chapterTitle={bank.chapterTitle}
-            courseChapters={courseChapters}
-            chaptersLoading={chaptersLoading}
-            selectedChapterId={bank.chapterId}
+            coursePaths={coursePaths}
+            pathsLoading={pathsLoading}
+            selectedPathId={bank.chapterId}
             courseId={bank.courseId}
             courseOutlineHint="Chọn chương khác để mở ngân hàng câu hỏi tương ứng."
-            onChapterSelect={selectChapter}
+            onPathSelect={selectChapter}
             onChapterQuizSetup={openQuizSetupForChapter}
             onCourseQuizSetup={openCourseQuizSetup}
           />
         </Box>
       </Box>
 
-      <Box id="qb-detail-mobile-footer" sx={{ display: { xs: 'flex', lg: 'none' }, mt: 2.5, pb: 4 }}>
-        {footerActions}
-      </Box>
-
-      <ScrollToTopButton avoidSelectors={['#app-site-footer', '#qb-detail-mobile-footer']} />
+      <ScrollToTopButton avoidSelectors={['#app-site-footer']} />
     </Box>
   );
 }

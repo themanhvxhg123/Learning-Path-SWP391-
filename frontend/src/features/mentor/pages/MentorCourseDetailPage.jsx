@@ -7,7 +7,7 @@
  *   courseId : string  — ID khóa học, từ useParams()
  *
  * URL search params:
- *   tab : "overview" | "content" | "students"
+ *   tab : "course" | "content" | "students" | "comments"
  *
  * ── Fetch data ───────────────────────────────────────────────────────────
  *   useEffect: gọi fetchMentorCourseDetail(courseId) khi mount
@@ -37,7 +37,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Box } from '@mui/material';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import ConfirmDialog from '@/shared/ui/ConfirmDialog';
 import EmptyState from '@/shared/ui/EmptyState';
 import Loading from '@/shared/ui/Loading';
@@ -46,6 +46,7 @@ import MentorCourseDetailHeader from '@/features/mentor/components/course/Mentor
 import MentorCourseOverviewTab from '@/features/mentor/components/course/MentorCourseOverviewTab';
 import MentorCourseContentTab from '@/features/mentor/components/course/MentorCourseContentTab';
 import MentorCourseStudentsTab from '@/features/mentor/components/course/MentorCourseStudentsTab';
+import MentorCourseCommentsTab from '@/features/mentor/components/course/MentorCourseCommentsTab';
 import {
   fetchMentorCourseDetail,
   updateCoursePublishStatus,
@@ -58,6 +59,7 @@ import {
 export default function MentorCourseDetailPage() {
   const navigate = useNavigate();
   const { courseId } = useParams();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -86,7 +88,7 @@ export default function MentorCourseDetailPage() {
 
   useEffect(() => {
     loadCourse();
-  }, [loadCourse, publishing]);
+  }, [loadCourse, publishing, location.state?.refreshedAt]);
 
   const handleTabChange = (tab) => {
     setSearchParams(
@@ -110,6 +112,8 @@ export default function MentorCourseDetailPage() {
       // ---------Students-----------
       case MENTOR_COURSE_DETAIL_TABS.STUDENTS:
         return <MentorCourseStudentsTab courseId={course.CourseId} />;
+      case MENTOR_COURSE_DETAIL_TABS.COMMENTS:
+        return <MentorCourseCommentsTab courseId={course.CourseId} />;
       default:
         return <MentorCourseOverviewTab course={course} />;
     }

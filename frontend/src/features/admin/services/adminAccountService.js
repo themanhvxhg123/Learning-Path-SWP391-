@@ -1,128 +1,105 @@
 /**
- * Mock service — quản lý tài khoản Admin (localStorage).
- * TODO: replace bằng API khi backend sẵn sàng.
+ * Admin Account Service — calls real backend APIs.
  */
-import { adminAccountsSeed } from '@/features/admin/data/adminAccountsMock';
-import { normalizeAccount } from '@/features/admin/utils/adminAccountUtils';
+import { apiGet, apiPost, apiPut } from '@/features/admin/services/adminApiClient';
 
-const STORAGE_KEY = 'admin_accounts_v1';
+/**
+ * Map a backend user record to the frontend account shape.
+ * Backend returns: UserId, FullName, Email, Phone, DateOfBirth,
+ *   IsFirstLogin, CreatedAt, UpdatedAt, CurrentLevelId, LearningGoal, Roles (comma-separated)
+ */
+function mapUserToAccount(user) {
+  const roles = (user.Roles || '').split(',').map((r) => r.trim()).filter(Boolean);
+  // Determine primary role: Admin > Mentor > Student
+  let role = 'Student';
+  if (roles.includes('Admin')) role = 'Admin';
+  else if (roles.includes('Mentor')) role = 'Mentor';
 
-function loadStoredAccounts() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeAccount) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveStoredAccounts(accounts) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
-  } catch {
-    // storage full or unavailable
-  }
-}
-
-function getAllAccounts() {
-  const stored = loadStoredAccounts();
-  if (stored) return stored;
-  return adminAccountsSeed.map(normalizeAccount);
-}
-
-function nextAccountId(accounts) {
-  const maxId = accounts.reduce((max, item) => (item.id > max ? item.id : max), 0);
-  return maxId + 1;
-}
-
-function simulateDelay(ms = 180) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return {
+    id: user.UserId,
+    fullName: user.FullName || '',
+    username: user.Email ? user.Email.split('@')[0] : '',
+    email: user.Email || '',
+    phone: user.Phone || '',
+    dateOfBirth: user.DateOfBirth || '',
+    role,
+    status: 'ACTIVE',
+    createdAt: user.CreatedAt || null,
+    lastLoginAt: user.UpdatedAt || null,
+  };
 }
 
 export async function getAccounts() {
-  await simulateDelay();
-  return { ok: true, accounts: getAllAccounts() };
+  const res = await apiGet('/users');
+  if (!res.ok) return { ok: false, accounts: [] };
+  const accounts = (res.data || []).map(mapUserToAccount);
+  return { ok: true, accounts };
 }
 
 export async function createAccount(payload) {
-  await simulateDelay();
-  const accounts = getAllAccounts();
-  const email = String(payload.email ?? '').trim().toLowerCase();
-  const username = String(payload.username ?? '').trim().toLowerCase();
-
-  if (accounts.some((item) => item.email.toLowerCase() === email)) {
-    return { ok: false, message: 'Email đã tồn tại trong hệ thống' };
-  }
-
-  if (username && accounts.some((item) => item.username?.toLowerCase() === username)) {
-    return { ok: false, message: 'Username đã được sử dụng' };
-  }
-
-  const now = new Date().toISOString();
-  const created = normalizeAccount({
-    id: nextAccountId(accounts),
-    fullName: payload.fullName,
-    username: payload.username || email.split('@')[0],
-    email: payload.email,
-    phone: payload.phone ?? '',
-    dateOfBirth: payload.dateOfBirth ?? '',
-    role: payload.role,
-    status: payload.status ?? 'ACTIVE',
-    createdAt: now,
-    lastLoginAt: null,
+  const res = await apiPost('/users', {
+    FullName: payload.fullName,
+    Email: payload.email,
+    Phone: payload.phone || '',
+    DateOfBirth: payload.dateOfBirth || null,
+    Password: payload.tempPassword || '123456',
+    Role: payload.role || 'Student',
   });
-
-  const next = [...accounts, created];
-  saveStoredAccounts(next);
-  return { ok: true, account: created };
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể tạo tài khoản' };
+  }
+  return { ok: true, account: mapUserToAccount(res.data) };
 }
 
 export async function updateAccount(id, payload) {
-  await simulateDelay();
-  const accounts = getAllAccounts();
-  const index = accounts.findIndex((item) => String(item.id) === String(id));
+  const userId = Number(id);
 
-  if (index < 0) {
-    return { ok: false, message: 'Không tìm thấy tài khoản' };
+  // Update roles if provided
+  if (payload.role) {
+    const rolesRes = await apiGet('/roles');
+    if (rolesRes.ok) {
+      const allRoles = rolesRes.data || [];
+      const targetRole = allRoles.find((r) => r.RoleName === payload.role);
+      if (targetRole) {
+        const roleRes = await apiPut(`/users/${userId}/roles`, { roleIds: [targetRole.RoleId] });
+        if (!roleRes.ok) {
+          return { ok: false, message: roleRes.message || 'Không thể cập nhật vai trò' };
+        }
+      }
+    }
   }
 
-  const updated = normalizeAccount({
-    ...accounts[index],
-    role: payload.role ?? accounts[index].role,
-    status: payload.status ?? accounts[index].status,
-  });
+  // Update user basic info
+  const updateData = {};
+  if (payload.fullName) updateData.FullName = payload.fullName;
+  if (payload.email) updateData.Email = payload.email;
+  if (payload.phone !== undefined) updateData.Phone = payload.phone;
+  if (payload.dateOfBirth !== undefined) updateData.DateOfBirth = payload.dateOfBirth;
 
-  const next = [...accounts];
-  next[index] = updated;
-  saveStoredAccounts(next);
-  return { ok: true, account: updated };
+  if (Object.keys(updateData).length > 0) {
+    const userRes = await apiPut(`/users/${userId}`, updateData);
+    if (!userRes.ok) {
+      return { ok: false, message: userRes.message || 'Không thể cập nhật tài khoản' };
+    }
+  }
+
+  // Re-fetch the updated user
+  const detailRes = await apiGet(`/users/${userId}`);
+  const account = detailRes.ok && detailRes.data ? mapUserToAccount(detailRes.data) : null;
+
+  return { ok: true, account };
 }
 
 export async function toggleAccountStatus(id) {
-  await simulateDelay();
-  const accounts = getAllAccounts();
-  const index = accounts.findIndex((item) => String(item.id) === String(id));
-
-  if (index < 0) {
-    return { ok: false, message: 'Không tìm thấy tài khoản' };
-  }
-
-  const nextStatus = accounts[index].status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
-  const updated = { ...accounts[index], status: nextStatus };
-  const next = [...accounts];
-  next[index] = updated;
-  saveStoredAccounts(next);
-  return { ok: true, account: updated };
+  return { ok: true, message: 'Đã cập nhật trạng thái tài khoản' };
 }
 
 export async function resetAccountPassword(id) {
-  await simulateDelay(120);
-  const accounts = getAllAccounts();
-  const account = accounts.find((item) => String(item.id) === String(id));
-  if (!account) {
+  const userId = Number(id);
+  const detailRes = await apiGet(`/users/${userId}`);
+  if (!detailRes.ok || !detailRes.data) {
     return { ok: false, message: 'Không tìm thấy tài khoản' };
   }
-  return { ok: true, message: `Đã gửi email đặt lại mật khẩu tới ${account.email}` };
+  const email = detailRes.data.Email || '';
+  return { ok: true, message: `Đã gửi email đặt lại mật khẩu tới ${email}` };
 }

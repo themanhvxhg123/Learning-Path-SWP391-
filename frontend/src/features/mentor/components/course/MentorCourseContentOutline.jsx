@@ -9,16 +9,35 @@ import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import {
-  getMaterialReviewDetailSummary,
+  getMaterialOutlineDetail,
   countMaterialsInPath,
   REVIEW_OUTLINE_TYPE_LABELS,
 } from '@/features/mentor/utils/mentorCourseReviewUtils';
+import {
+  getNodeMaterials,
+  getPathNodes,
+  normalizeMaterialForDisplay,
+} from '@/features/mentor/utils/mentorCourseContentUtils';
 import { MUTED, TEXT } from './mentorCourseCreateStyles';
 import {
   CHAPTER_THEME,
   LESSON_THEME,
   MATERIAL_TYPE_THEME,
 } from './mentorCourseContentStyles';
+
+const MATERIAL_LINK_SX = {
+  color: '#2563EB',
+  textDecoration: 'underline',
+  fontSize: 'inherit',
+  fontWeight: 500,
+  wordBreak: 'break-word',
+  cursor: 'pointer',
+  transition: 'color 0.15s ease',
+  '&:hover': {
+    color: '#1D4ED8',
+    textDecoration: 'underline',
+  },
+};
 
 function getItemKey(item, fallback) {
   return (
@@ -35,10 +54,11 @@ function getItemKey(item, fallback) {
 
 function MaterialOutlineRow({ material }) {
   const [expanded, setExpanded] = useState(false);
-  const typeLabel = REVIEW_OUTLINE_TYPE_LABELS[material.MaterialType] ?? 'Học liệu';
-  const title = String(material.Title ?? '').trim() || typeLabel;
-  const detail = getMaterialReviewDetailSummary(material);
-  const theme = MATERIAL_TYPE_THEME[material.MaterialType] ?? MATERIAL_TYPE_THEME.VIDEO;
+  const normalized = normalizeMaterialForDisplay(material);
+  const typeLabel = REVIEW_OUTLINE_TYPE_LABELS[normalized.MaterialType] ?? 'Học liệu';
+  const title = String(normalized.Title ?? '').trim() || typeLabel;
+  const detail = getMaterialOutlineDetail(normalized);
+  const theme = MATERIAL_TYPE_THEME[normalized.MaterialType] ?? MATERIAL_TYPE_THEME.VIDEO;
 
   return (
     <Box
@@ -86,20 +106,42 @@ function MaterialOutlineRow({ material }) {
       {detail && (
         <Collapse in={expanded}>
           <Box sx={{ px: 1.5, pb: 1.15, pt: 0.25 }}>
-            <Typography
-              sx={{
-                fontSize: 11.5,
-                color: MUTED,
-                lineHeight: 1.5,
-                wordBreak: 'break-word',
-                display: '-webkit-box',
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {detail}
-            </Typography>
+            {detail.type === 'link' ? (
+              <Typography
+                component="div"
+                sx={{
+                  fontSize: 11.5,
+                  color: MUTED,
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                }}
+              >
+                <Box
+                  component="a"
+                  href={detail.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={MATERIAL_LINK_SX}
+                >
+                  {detail.label}
+                </Box>
+              </Typography>
+            ) : (
+              <Typography
+                sx={{
+                  fontSize: 11.5,
+                  color: MUTED,
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {detail.text}
+              </Typography>
+            )}
           </Box>
         </Collapse>
       )}
@@ -109,8 +151,8 @@ function MaterialOutlineRow({ material }) {
 
 function ChapterOutline({ path, pathIndex, defaultExpanded }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const nodes = path.Nodes ?? [];
-  const chapterTitle = path.PathName || `Chương ${pathIndex + 1}`;
+  const nodes = getPathNodes(path);
+  const chapterTitle = path.PathName || path.pathName || `Chương ${pathIndex + 1}`;
   const materialCount = countMaterialsInPath(path);
 
   return (
@@ -133,7 +175,6 @@ function ChapterOutline({ path, pathIndex, defaultExpanded }) {
           borderBottom: expanded ? `1px solid ${CHAPTER_THEME.border}` : 'none',
         }}
       >
-        {console.log(path)}
         <IconButton size="small" onClick={() => setExpanded((prev) => !prev)} sx={{ p: 0.4 }}>
           {expanded ? (
             <ExpandLessRoundedIcon sx={{ fontSize: 20, color: CHAPTER_THEME.color }} />
@@ -141,7 +182,6 @@ function ChapterOutline({ path, pathIndex, defaultExpanded }) {
             <ExpandMoreRoundedIcon sx={{ fontSize: 20, color: CHAPTER_THEME.color }} />
           )}
         </IconButton>
-        {console.log("nodes", nodes)}
         <MenuBookRoundedIcon sx={{ fontSize: 18, color: CHAPTER_THEME.color }} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, lineHeight: 1.4 }}>
@@ -166,8 +206,8 @@ function ChapterOutline({ path, pathIndex, defaultExpanded }) {
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {nodes.map((node, nodeIndex) => {
-                const materials = node.Materials ?? [];
-                const lessonTitle = node.NodeName || `Bài ${nodeIndex + 1}`;
+                const materials = getNodeMaterials(node, { learningOnly: true });
+                const lessonTitle = node.NodeName || node.nodeName || `Bài ${nodeIndex + 1}`;
 
                 return (
                   <Box

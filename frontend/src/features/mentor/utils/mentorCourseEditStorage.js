@@ -37,6 +37,7 @@ export function mapDetailPathsToEditPaths(detailPaths = []) {
             SourceType: material.SourceType ?? material.sourceType,
             EmbedUrl: material.EmbedUrl ?? material.embedUrl,
             FileName: material.FileName ?? material.fileName,
+            FileSize: material.FileSize ?? material.fileSize ?? null,
             tempId: createTempId('material'),
           }),
         ),
@@ -52,14 +53,17 @@ export function mapDetailPathsToEditPaths(detailPaths = []) {
  */
 export function courseDetailToEditCourse(course) {
   return {
-    CourseId: course.courseId ?? null,
-    CourseName: course.courseName ?? '',
-    Description: course.description ?? '',
-    Thumbnail: course.thumbnail ?? null,
-    CategoryId: course.categoryId ?? null,
-    LevelId: course.levelId ?? null,
-    InstructorId: course.instructorId ?? null,
-    IsPublished: course.status === 'published',
+    CourseId: course.courseId ?? course.CourseId ?? null,
+    CourseName: course.courseName ?? course.CourseName ?? '',
+    Description: course.description ?? course.Description ?? '',
+    Thumbnail: course.thumbnail ?? course.Thumbnail ?? null,
+    CategoryId: course.categoryId ?? course.CategoryId ?? null,
+    LevelId: course.levelId ?? course.LevelId ?? null,
+    InstructorId: course.instructorId ?? course.InstructorId ?? null,
+    IsPublished: course.status === 'published'
+      || course.isPublished === true
+      || course.IsPublished === true
+      || course.IsPublished === 1,
   };
 }
 
@@ -68,12 +72,19 @@ export function courseDetailToEditCourse(course) {
  */
 export function courseDetailToEditForm(course) {
   return {
-    CourseName: course.courseName ?? '',
-    Description: course.description ?? '',
-    CategoryId: course.categoryId != null ? String(course.categoryId) : '',
-    LevelId: course.levelId != null ? String(course.levelId) : '',
-    Thumbnail: course.thumbnail ?? '',
-    IsPublished: course.status === 'published',
+    CourseName: course.courseName ?? course.CourseName ?? '',
+    Description: course.description ?? course.Description ?? '',
+    CategoryId: (course.categoryId ?? course.CategoryId) != null
+      ? String(course.categoryId ?? course.CategoryId)
+      : '',
+    LevelId: (course.levelId ?? course.LevelId) != null
+      ? String(course.levelId ?? course.LevelId)
+      : '',
+    Thumbnail: course.thumbnail ?? course.Thumbnail ?? '',
+    IsPublished: course.status === 'published'
+      || course.isPublished === true
+      || course.IsPublished === true
+      || course.IsPublished === 1,
   };
 }
 
@@ -118,6 +129,6 @@ export function persistEditContent(courseId, coursePascal, paths) {
     courseId: Number(courseId),
     course: coursePascal ?? prev.course,
     paths: sanitizePathsForStorage(paths),
-    meta: { ...(prev.meta ?? {}), contentSaved: true },
+    meta: { ...(prev.meta ?? {}), contentSaved: true, profileOnly: false },
   });
 }

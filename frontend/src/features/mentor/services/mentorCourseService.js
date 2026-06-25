@@ -26,8 +26,34 @@ import {
 import { buildCreateCourseStep1Payload } from '@/features/mentor/utils/mentorCourseFormUtils';
 import { saveCreateCourseStep1ToStorage, saveCreateCourseContentToStorage } from '@/features/mentor/utils/mentorCourseCreateStorage';
 import { buildCourseContentPayload, buildFullCreateCoursePayload } from '@/features/mentor/utils/mentorCourseContentUtils';
+import { uploadPendingMaterialsInPaths } from '@/features/mentor/utils/mentorMaterialUploadUtils';
+import { getUser } from '@/features/auth/utils/authUtils';
+import { mapMentorCourseComment } from '@/features/mentor/utils/mentorCourseCommentsUtils';
+import { getInitialComments } from '@/features/courses/data/courseCommentsMock';
 
 const API_BASE = 'http://localhost:5000/api';
+
+function getMentorAuthHeaders() {
+  const userId = getUser()?.userId;
+  const headers = { 'Content-Type': 'application/json' };
+  if (userId) {
+    headers['x-user-id'] = String(userId);
+  }
+  return headers;
+}
+
+function buildUpdateCourseBasicPayload(course = {}) {
+  const thumbnail = course.Thumbnail ?? course.thumbnail ?? null;
+  return {
+    CourseName: course.CourseName ?? course.courseName ?? '',
+    Description: course.Description ?? course.description ?? '',
+    Thumbnail: thumbnail != null && String(thumbnail).trim() !== '' ? thumbnail : null,
+    CategoryId: course.CategoryId ?? course.categoryId ?? null,
+    LevelId: course.LevelId ?? course.levelId ?? null,
+    IsPublished: Boolean(course.IsPublished ?? course.isPublished),
+    InstructorId: course.InstructorId ?? course.instructorId ?? getUser()?.userId ?? null,
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DANH SÁCH KHÓA HỌC
@@ -93,7 +119,7 @@ export async function fetchMentorCourses() {
     if (!userId) {
       return {
         ok: false,
-        message: "Không tìm thấy userId trong sessionStorage.",
+        message: "Không tìm thấy userId trong localStorage.",
       };
     }
 
@@ -337,9 +363,10 @@ export async function saveCreateCourseContent(course, paths, meta) {
  * TODO: replace mock with real API call
  */
 export async function createCourseWithContent(course, paths) {
-  const payload = buildFullCreateCoursePayload(course, paths);
-
   try {
+    const uploadedPaths = await uploadPendingMaterialsInPaths(paths);
+    const payload = buildFullCreateCoursePayload(course, uploadedPaths);
+
     const response = await fetch(`${API_BASE}/courses/mentor/courses/createCourse`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -358,9 +385,11 @@ export async function createCourseWithContent(course, paths) {
     const courseId = data.courseId ?? data.data?.courseId ?? null;
     return { success: true, courseId, payload };
   } catch (error) {
-    console.error('[createCourseWithContent]', error.message);
-    await delay(600);
-    return { success: true, courseId: Date.now(), payload };
+    console.error('[createCourseWithContent]', error);
+    return {
+      success: false,
+      message: error.message ?? 'Không thể tạo khóa học.',
+    };
   }
 }
 
@@ -525,19 +554,27 @@ export async function fetchMentorCourseDetail(courseId) {
  * TODO: replace mock with real API call
  */
 export async function updateCourseBasicInfo(courseId, payload) {
-  // TODO: replace with real API
-  // const response = await fetch(`${API_BASE}/mentor/courses/${courseId}`, {
-  //   method:  'PATCH',
-  //   headers: { 'Content-Type': 'application/json', 'x-user-id': String(getUser()?.userId) },
-  //   body:    JSON.stringify(payload),
-  // });
-  // const data = await response.json();
-  // if (!response.ok) return { ok: false, message: data.message };
-  // return { ok: true, courseId };
+  try {
+    const response = await fetch(`${API_BASE}/mentor/courses/${courseId}`, {
+      method: 'PATCH',
+      headers: getMentorAuthHeaders(),
+      body: JSON.stringify(buildUpdateCourseBasicPayload(payload)),
+    });
 
-  void courseId; void payload;
-  await delay(400);
-  return { ok: true, courseId };
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data.success) {
+      return {
+        ok: false,
+        message: data.message ?? 'Không thể cập nhật thông tin khóa học.',
+      };
+    }
+
+    return { ok: true, courseId: data.courseId ?? Number(courseId) };
+  } catch (error) {
+    console.error('[updateCourseBasicInfo]', error);
+    return { ok: false, message: 'Lỗi kết nối khi cập nhật khóa học.' };
+  }
 }
 
 /**
@@ -558,20 +595,29 @@ export async function updateCourseBasicInfo(courseId, payload) {
  * TODO: replace mock with real API call
  */
 export async function updateCourseContent(courseId, paths) {
-  // TODO: replace with real API
-  // const payload = buildCourseContentPayload(paths);
-  // const response = await fetch(`${API_BASE}/mentor/courses/${courseId}/content`, {
-  //   method:  'PUT',
-  //   headers: { 'Content-Type': 'application/json', 'x-user-id': String(getUser()?.userId) },
-  //   body:    JSON.stringify(payload),
-  // });
-  // const data = await response.json();
-  // if (!response.ok) return { ok: false, message: data.message };
-  // return { ok: true };
+  try {
+    const uploadedPaths = await uploadPendingMaterialsInPaths(paths);
+    const payload = buildCourseContentPayload(uploadedPaths);
+    const response = await fetch(`${API_BASE}/mentor/courses/${courseId}/content`, {
+      method: 'PUT',
+      headers: getMentorAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
 
-  void courseId; void paths;
-  await delay(400);
-  return { ok: true };
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || !data.success) {
+      return {
+        ok: false,
+        message: data.message ?? 'Không thể cập nhật nội dung khóa học.',
+      };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    console.error('[updateCourseContent]', error);
+    return { ok: false, message: error.message ?? 'Lỗi kết nối khi cập nhật nội dung khóa học.' };
+  }
 }
 
 /**
@@ -713,6 +759,89 @@ export async function fetchCourseStudentStats(courseId) {
     return { ok: false, stats: computeCourseStudentStats([]), message: result.message };
   }
   return { ok: true, stats: computeCourseStudentStats(result.students) };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BÌNH LUẬN KHÓA HỌC
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/mentor/courses/:courseId/comments
+ */
+export async function fetchMentorCourseComments(courseId) {
+  try {
+    const response = await fetch(`${API_BASE}/mentor/courses/${courseId}/comments`, {
+      headers: getMentorAuthHeaders(),
+    });
+    const res = await response.json();
+
+    if (!response.ok || !res.success) {
+      return {
+        ok: false,
+        comments: [],
+        message: res.message ?? 'Không lấy được bình luận.',
+      };
+    }
+
+    const rows = Array.isArray(res.data) ? res.data : [];
+    return {
+      ok: true,
+      comments: rows.length > 0 ? rows.map(mapMentorCourseComment) : getInitialComments(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      comments: getInitialComments(),
+      message: error.message ?? 'Lỗi kết nối server.',
+    };
+  }
+}
+
+/**
+ * PATCH /api/mentor/courses/:courseId/comments/:commentId/reply
+ */
+export async function replyMentorCourseComment(courseId, commentId, content) {
+  try {
+    const response = await fetch(
+      `${API_BASE}/mentor/courses/${courseId}/comments/${commentId}/reply`,
+      {
+        method: 'PATCH',
+        headers: getMentorAuthHeaders(),
+        body: JSON.stringify({ content }),
+      },
+    );
+    const res = await response.json();
+
+    if (!response.ok || !res.success || !res.data) {
+      return { ok: false, message: res.message ?? 'Không thể gửi phản hồi.' };
+    }
+
+    return { ok: true, comment: mapMentorCourseComment(res.data) };
+  } catch (error) {
+    return { ok: false, message: error.message ?? 'Lỗi kết nối server.' };
+  }
+}
+
+/**
+ * POST /api/mentor/courses/:courseId/comments
+ */
+export async function createMentorCourseComment(courseId, content) {
+  try {
+    const response = await fetch(`${API_BASE}/mentor/courses/${courseId}/comments`, {
+      method: 'POST',
+      headers: getMentorAuthHeaders(),
+      body: JSON.stringify({ content }),
+    });
+    const res = await response.json();
+
+    if (!response.ok || !res.success || !res.data) {
+      return { ok: false, message: res.message ?? 'Không thể gửi bình luận.' };
+    }
+
+    return { ok: true, comment: mapMentorCourseComment(res.data) };
+  } catch (error) {
+    return { ok: false, message: error.message ?? 'Lỗi kết nối server.' };
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

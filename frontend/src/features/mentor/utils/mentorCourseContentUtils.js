@@ -9,8 +9,44 @@ export const MATERIAL_TYPES = ['VIDEO', 'TEXT', 'DOC'];
 /** Học liệu thực tế trong bài học — không gồm bài kiểm tra (quản lý riêng qua ngân hàng câu hỏi). */
 export const LEARNING_MATERIAL_TYPES = MATERIAL_TYPES;
 
+export function normalizeMaterialType(type) {
+  return String(type ?? '').trim().toUpperCase();
+}
+
+export function normalizeMaterialForDisplay(material = {}) {
+  const MaterialType = normalizeMaterialType(material.MaterialType ?? material.materialType);
+
+  return {
+    ...material,
+    MaterialType,
+    Title: material.Title ?? material.title ?? '',
+    MaterialUrl: material.MaterialUrl ?? material.materialUrl ?? '',
+    Content: material.Content ?? material.content ?? '',
+    FileName: material.FileName ?? material.fileName ?? '',
+    FileSize: material.FileSize ?? material.fileSize ?? null,
+    SourceType: material.SourceType ?? material.sourceType ?? null,
+    EmbedUrl: material.EmbedUrl ?? material.embedUrl ?? null,
+    MaterialId: material.MaterialId ?? material.materialId ?? null,
+  };
+}
+
+export function getPathNodes(path = {}) {
+  return path.nodes ?? path.Nodes ?? [];
+}
+
+export function getNodeMaterials(node = {}, { learningOnly = false } = {}) {
+  const raw = (node.materials ?? node.Materials ?? []).map(normalizeMaterialForDisplay);
+  return learningOnly ? filterLearningMaterials(raw) : raw;
+}
+
+export function getCoursePaths(course = {}) {
+  return course.paths ?? course.Paths ?? [];
+}
+
 export function isLearningMaterial(material) {
-  return LEARNING_MATERIAL_TYPES.includes(material?.MaterialType);
+  return LEARNING_MATERIAL_TYPES.includes(
+    normalizeMaterialType(material?.MaterialType ?? material?.materialType),
+  );
 }
 
 export function filterLearningMaterials(materials = []) {
@@ -22,9 +58,8 @@ export function countLearningMaterials(materials = []) {
 }
 
 export function countMaterialsInPath(path = {}) {
-  const nodes = path.nodes ?? path.Nodes ?? [];
-  return nodes.reduce(
-    (sum, node) => sum + countLearningMaterials(node.materials ?? node.Materials),
+  return getPathNodes(path).reduce(
+    (sum, node) => sum + countLearningMaterials(getNodeMaterials(node)),
     0,
   );
 }
@@ -99,6 +134,36 @@ export function getVideoDefaultFields() {
 
 export const DOC_ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx'];
 
+/** Khớp giới hạn Cloudinary free tier. */
+export const DOC_MAX_BYTES = 10 * 1024 * 1024;
+export const TEXT_MAX_BYTES = DOC_MAX_BYTES;
+
+export function getMaterialMaxFileSizeLabel() {
+  return '10 MB';
+}
+
+export function isAllowedDocFile(file) {
+  if (!file?.name) return false;
+  const lower = file.name.toLowerCase();
+  return DOC_ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+export function validateDocFile(file) {
+  if (!file) {
+    return { ok: false, message: 'Vui lòng chọn file tài liệu.' };
+  }
+  if (!isAllowedDocFile(file)) {
+    return { ok: false, message: 'Chỉ hỗ trợ PDF, DOC, DOCX, PPT, PPTX.' };
+  }
+  if (file.size > DOC_MAX_BYTES) {
+    return {
+      ok: false,
+      message: `File quá lớn. Dung lượng tối đa là ${getMaterialMaxFileSizeLabel()}.`,
+    };
+  }
+  return { ok: true };
+}
+
 export function getDocDefaultFields() {
   return {
     SourceType: DOC_SOURCE_UPLOAD,
@@ -107,12 +172,6 @@ export function getDocDefaultFields() {
     FileSize: null,
     MaterialUrl: '',
   };
-}
-
-export function isAllowedDocFile(file) {
-  if (!file?.name) return false;
-  const lower = file.name.toLowerCase();
-  return DOC_ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
 export function getDocFileTypeLabel(fileName) {
@@ -316,8 +375,15 @@ export function validateCourseContent(paths, options = {}) {
         }
 
         if (material.MaterialType === 'TEXT') {
-          if (isHtmlContentEmpty(material.Content)) {
+          const hasContent = !isHtmlContentEmpty(material.Content);
+          const hasUploadedUrl = Boolean(String(material.MaterialUrl ?? '').trim());
+          if (!hasContent && !hasUploadedUrl) {
             materialErrors.Content = 'Vui lòng nhập nội dung văn bản';
+          } else if (
+            hasContent
+            && new Blob([String(material.Content ?? '')]).size > TEXT_MAX_BYTES
+          ) {
+            materialErrors.Content = `Nội dung văn bản quá lớn. Dung lượng tối đa là ${getMaterialMaxFileSizeLabel()}.`;
           }
         } else if (material.MaterialType === 'DOC') {
           if (!String(material.Title ?? '').trim()) {
@@ -328,8 +394,15 @@ export function validateCourseContent(paths, options = {}) {
             material.SourceType === DOC_SOURCE_LINK ? DOC_SOURCE_LINK : DOC_SOURCE_UPLOAD;
 
           if (sourceType === DOC_SOURCE_UPLOAD) {
-            if (!material.File) {
+            const hasFile = Boolean(material.File);
+            const hasUrl = Boolean(String(material.MaterialUrl ?? '').trim());
+            if (!hasFile && !hasUrl) {
               materialErrors.File = 'Vui lòng chọn file tài liệu';
+            } else if (hasFile) {
+              const fileCheck = validateDocFile(material.File);
+              if (!fileCheck.ok) {
+                materialErrors.File = fileCheck.message;
+              }
             }
           } else {
             const materialUrl = String(material.MaterialUrl ?? '').trim();
@@ -478,37 +551,25 @@ export function buildCourseContentPayload(paths) {
             };
 
             if (material.MaterialType === 'TEXT') {
-              // TODO: backend should support Content for TEXT material
               return {
                 ...base,
-                MaterialUrl: null,
-                Content: String(Content ?? '').trim(),
+                SourceType: material.SourceType ?? 'UPLOAD',
+                MaterialUrl: String(material.MaterialUrl ?? '').trim() || null,
+                FileName: material.FileName ?? null,
+                FileSize: material.FileSize ?? null,
               };
             }
 
             if (material.MaterialType === 'DOC') {
-              // TODO: backend should support document upload and SourceType
               const sourceType =
                 material.SourceType === DOC_SOURCE_LINK ? DOC_SOURCE_LINK : DOC_SOURCE_UPLOAD;
 
-              if (sourceType === DOC_SOURCE_LINK) {
-                return {
-                  ...base,
-                  SourceType: DOC_SOURCE_LINK,
-                  File: null,
-                  FileName: null,
-                  FileSize: null,
-                  MaterialUrl: String(material.MaterialUrl ?? '').trim() || null,
-                };
-              }
-
               return {
                 ...base,
-                SourceType: DOC_SOURCE_UPLOAD,
-                File: File ?? null,
+                SourceType: sourceType,
+                MaterialUrl: String(material.MaterialUrl ?? '').trim() || null,
                 FileName: material.FileName ?? null,
                 FileSize: material.FileSize ?? null,
-                MaterialUrl: null,
               };
             }
 

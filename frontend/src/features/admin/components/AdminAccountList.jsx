@@ -6,23 +6,17 @@ import Loading from '@/shared/ui/Loading';
 import AdminAccountRow from './AdminAccountRow';
 import { MUTED } from '@/features/mentor/components/course/mentorCourseCreateStyles';
 import {
-  ADMIN_ACCOUNT_TABLE_GRID_COLUMNS,
   ADMIN_ACCOUNT_TABLE_HEADERS,
+  ADMIN_ACCOUNT_TABLE_LAYOUT_SX,
+  getAdminAccountHeaderCellSx,
 } from '@/features/admin/utils/adminAccountUtils';
-
-const TABLE_ROW_SX = {
-  display: { xs: 'none', md: 'grid' },
-  gridTemplateColumns: ADMIN_ACCOUNT_TABLE_GRID_COLUMNS,
-  gap: 2,
-  px: 2.25,
-  alignItems: 'center',
-};
 
 function ListHeader() {
   return (
     <Box
       sx={{
-        ...TABLE_ROW_SX,
+        display: { xs: 'none', md: 'grid' },
+        ...ADMIN_ACCOUNT_TABLE_LAYOUT_SX,
         py: 1.25,
         bgcolor: 'rgba(15,23,42,0.02)',
         borderBottom: '1px solid rgba(15,23,42,0.06)',
@@ -35,7 +29,7 @@ function ListHeader() {
             fontSize: 11,
             fontWeight: 700,
             color: MUTED,
-            textAlign: index === ADMIN_ACCOUNT_TABLE_HEADERS.length - 1 ? 'right' : 'left',
+            ...getAdminAccountHeaderCellSx(index),
           }}
         >
           {label}

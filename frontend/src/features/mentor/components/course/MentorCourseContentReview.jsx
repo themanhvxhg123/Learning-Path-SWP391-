@@ -17,6 +17,7 @@ import {
   REVIEW_OUTLINE_TYPE_LABELS,
 } from '@/features/mentor/utils/mentorCourseReviewUtils';
 import { CREATE_CARD_SX, MUTED, TEXT } from './mentorCourseCreateStyles';
+import MentorCardSectionTitle from './MentorCardSectionTitle';
 import {
   CHAPTER_THEME,
   LESSON_THEME,
@@ -198,34 +199,26 @@ export default function MentorCourseContentReview({ paths = [] }) {
 
   return (
     <Box sx={CREATE_CARD_SX}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 1.5,
-          mb: 2,
-        }}
-      >
-        <Typography sx={{ fontSize: 17, fontWeight: 800, color: TEXT }}>
-          Nội dung khóa học
-        </Typography>
-        <AppButton
-          variant="outlined"
-          startIcon={<EditOutlinedIcon sx={{ fontSize: 16 }} />}
-          onClick={() => navigate('/mentor/courses/create/content')}
-          sx={{
-            height: 34,
-            borderRadius: '999px',
-            fontSize: 12,
-            fontWeight: 700,
-            px: 1.5,
-            flexShrink: 0,
-          }}
-        >
-          Chỉnh sửa nội dung
-        </AppButton>
-      </Box>
+      <MentorCardSectionTitle
+        title="Nội dung khóa học"
+        action={
+          <AppButton
+            variant="outlined"
+            startIcon={<EditOutlinedIcon sx={{ fontSize: 16 }} />}
+            onClick={() => navigate('/mentor/courses/create/content')}
+            sx={{
+              height: 34,
+              borderRadius: '999px',
+              fontSize: 12,
+              fontWeight: 600,
+              px: 1.5,
+              flexShrink: 0,
+            }}
+          >
+            Chỉnh sửa nội dung
+          </AppButton>
+        }
+      />
 
       {paths.length === 0 ? (
         <Typography sx={{ fontSize: 14, color: MUTED }}>Chưa có chương nào.</Typography>

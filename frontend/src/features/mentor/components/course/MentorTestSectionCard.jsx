@@ -143,19 +143,13 @@ function AddQuestionButton({ onClick, disabled, label = 'Thêm câu hỏi', vari
   );
 }
 
-function getDeleteConfirmContent(deleteConfirm, { questionBankMode, isWritingQuestionBank }) {
+function getDeleteConfirmContent(deleteConfirm, { questionBankMode }) {
   if (!deleteConfirm) {
     return { title: 'Xác nhận', message: '' };
   }
 
   if (deleteConfirm.type === 'section') {
     if (questionBankMode) {
-      if (isWritingQuestionBank) {
-        return {
-          title: 'Xóa nhóm này?',
-          message: 'Toàn bộ câu hỏi trong nhóm sẽ bị xóa. Bạn không thể hoàn tác.',
-        };
-      }
       return {
         title: 'Xóa bài này?',
         message: 'Toàn bộ câu hỏi trong bài sẽ bị xóa. Bạn không thể hoàn tác.',
@@ -234,16 +228,9 @@ export default function MentorTestSectionCard({
       ? 'Nhập nội dung bài đọc...'
       : 'Mô tả ngắn cho bài (tuỳ chọn)';
   })();
-  const listeningPromptValue = (() => {
-    const title = String(section.SectionTitle ?? '').trim();
-    const desc = String(section.Description ?? '').trim();
-    if (title && desc) return `${title}\n\n${desc}`;
-    return title || desc;
-  })();
+  const listeningPromptValue = String(section.SectionTitle ?? '');
   const emptyQuestionsText = questionBankMode
-    ? isWritingQuestionBank
-      ? 'Chưa có câu hỏi trong nhóm này.'
-      : 'Chưa có câu hỏi trong bài này.'
+    ? 'Chưa có câu hỏi trong bài này.'
     : 'Chưa có câu hỏi trong phần này.';
 
   const updateSection = (patch) => onChange({ ...section, ...patch });
@@ -293,7 +280,6 @@ export default function MentorTestSectionCard({
 
   const deleteDialogContent = getDeleteConfirmContent(deleteConfirm, {
     questionBankMode,
-    isWritingQuestionBank,
   });
 
   const sectionHasPersistedQuestions =
@@ -365,28 +351,34 @@ export default function MentorTestSectionCard({
         >
           {/* QB mode: skill name only */}
           {questionBankMode ? (
-            <InputBase
-              value={section.DisplayName ?? ''}
-              onChange={(event) => updateSection({ DisplayName: event.target.value })}
-              disabled={disabled}
-              placeholder={sectionNamePlaceholder}
-              fullWidth
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                fontSize: 13,
-                fontWeight: 600,
-                color: TEXT,
-                px: 0.35,
-                py: 0.2,
-                borderBottom: `1px solid ${errors.DisplayName ? '#DC2626' : 'rgba(15,23,42,0.12)'}`,
-                borderRadius: 0,
-                '&:focus-within': {
-                  borderBottomColor: errors.DisplayName ? '#DC2626' : skillAccent,
-                },
-                '& input::placeholder': { color: MUTED, opacity: 1, fontWeight: 500 },
-              }}
-            />
+            isWritingQuestionBank ? (
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, px: 0.35 }}>
+                {TEST_SKILL_LABELS[skillType]}
+              </Typography>
+            ) : (
+              <InputBase
+                value={section.DisplayName ?? ''}
+                onChange={(event) => updateSection({ DisplayName: event.target.value })}
+                disabled={disabled}
+                placeholder={sectionNamePlaceholder}
+                fullWidth
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: TEXT,
+                  px: 0.35,
+                  py: 0.2,
+                  borderBottom: `1px solid ${errors.DisplayName ? '#DC2626' : 'rgba(15,23,42,0.12)'}`,
+                  borderRadius: 0,
+                  '&:focus-within': {
+                    borderBottomColor: errors.DisplayName ? '#DC2626' : skillAccent,
+                  },
+                  '& input::placeholder': { color: MUTED, opacity: 1, fontWeight: 500 },
+                }}
+              />
+            )
           ) : (
             <>
               <Typography
@@ -508,26 +500,7 @@ export default function MentorTestSectionCard({
                 }}
               />
             </Box>
-          ) : isWritingQuestionBank ? (
-            <Box sx={{ mb: 1.5 }}>
-              <ContentFieldLabel sx={fieldLabelSx}>Đề bài</ContentFieldLabel>
-              <InputBase
-                value={section.SectionTitle ?? ''}
-                onChange={(event) => updateSection({ SectionTitle: event.target.value })}
-                disabled={disabled}
-                placeholder="Ví dụ: Chọn dạng đúng của động từ trong ngoặc"
-                fullWidth
-                multiline
-                minRows={2}
-                maxRows={6}
-                sx={{
-                  ...multilineInputSx(false, skillAccent),
-                  py: 0.55,
-                  minHeight: 'unset',
-                }}
-              />
-            </Box>
-          ) : (
+          ) : isWritingQuestionBank ? null : (
             <>
               <Box sx={{ mb: 1.25 }}>
                 <ContentFieldLabel sx={fieldLabelSx}>{sectionTitleLabel}</ContentFieldLabel>

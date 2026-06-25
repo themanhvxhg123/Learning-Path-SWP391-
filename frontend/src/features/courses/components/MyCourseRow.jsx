@@ -47,6 +47,7 @@ import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AppButton from "@/shared/ui/AppButton";
+import ThumbnailImage from "@/shared/ui/ThumbnailImage";
 import AppProgressBar, { getProgressColor } from "@/shared/ui/AppProgressBar";
 import MyCourseProgressSummary from "./MyCourseProgressSummary";
 import { buildCourseDetailPath } from "@/features/courses/utils/courseListParams";
@@ -58,16 +59,8 @@ const PRIMARY = "#0891B2";
 const SAVED = "#F59E0B";
 
 const ghostIconSx = {
-  p: 0.25,
-  width: 28,
-  height: 28,
-  color: MUTED,
-  bgcolor: "transparent",
-  transition: "color 0.2s ease",
-  "&:hover": {
-    bgcolor: "transparent",
-    color: PRIMARY,
-  },
+  transition: "all 0.2s ease",
+  "&:hover": { bgcolor: "rgba(15,23,42,0.04)" },
 };
 
 function normalizeCourse(course = {}) {
@@ -75,7 +68,7 @@ function normalizeCourse(course = {}) {
   return {
     courseId: course.courseId ?? course.id,
     courseName: course.courseName ?? course.title ?? "Khóa học",
-    thumbnail: course.thumbnail ?? null,
+    thumbnail: course.Thumbnail ?? course.thumbnail ?? null,
     category: course.category ?? "",
     level: course.level ?? "",
     instructor: course.instructor ?? "",
@@ -94,6 +87,17 @@ function normalizeCourse(course = {}) {
   };
 }
 
+function getCompletedStatusChip() {
+  return {
+    label: "Hoàn thành",
+    sx: {
+      bgcolor: "rgba(4,120,87,0.12)",
+      color: "#047857",
+      border: "1px solid rgba(4,120,87,0.24)",
+    },
+  };
+}
+
 function getLearningStatusChip() {
   return {
     label: "Đang học",
@@ -105,16 +109,7 @@ function getLearningStatusChip() {
   };
 }
 
-function getCompletedStatusChip() {
-  return {
-    label: "Hoàn thành",
-    sx: {
-      bgcolor: "rgba(4,120,87,0.12)",
-      color: "#047857",
-      border: "1px solid rgba(4,120,87,0.24)",
-    },
-  };
-}
+
 
 function getSavedStatusChip() {
   return {
@@ -217,7 +212,7 @@ export default function MyCourseRow({
   const progressValue = Math.min(Math.max(data.progressPercentage, 0), 100);
   const detailPath = buildCourseDetailPath(data.courseId, searchParams, "/my-courses");
   const learningPath = `/my-courses/${data.courseId}/learn`;
-  const titlePath = isSavedRow ? detailPath : learningPath;
+  const titlePath = detailPath;
   const progressTextColor = getProgressColor(progressValue);
 
   const statusChip = isSavedRow
@@ -275,39 +270,18 @@ export default function MyCourseRow({
           pr: { xs: 2, md: canExpand || isSavedRow ? 7 : 2.25 },
         }}
       >
-        <Box
+        <ThumbnailImage
+          src={data.thumbnail}
+          label={data.courseName}
+          alt={data.courseName}
+          iconSize={20}
           sx={{
             width: { xs: "100%", md: 160 },
             flexShrink: 0,
             aspectRatio: "16 / 9",
             borderRadius: "12px",
-            overflow: "hidden",
-            bgcolor: alpha(theme.palette.primary.main, 0.06),
-            backgroundImage: data.thumbnail ? `url(http://localhost:5000${data.thumbnail})` : "none",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
           }}
-        >
-          {!data.thumbnail && (
-            <Box
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                color: "primary.main",
-              }}
-            >
-              <MenuBookOutlinedIcon sx={{ fontSize: 20 }} />
-            </Box>
-          )}
-        </Box>
+        />
 
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1.25 }}>
           <Typography

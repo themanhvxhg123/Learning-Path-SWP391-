@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Box, Breadcrumbs, CircularProgress, Divider, Link as MuiLink, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import AppButton from '@/shared/ui/AppButton';
 import { toast } from '@/shared/ui/Toast';
 import MentorCourseInfoReview from '@/features/mentor/components/course/MentorCourseInfoReview';
 import MentorCourseContentReview from '@/features/mentor/components/course/MentorCourseContentReview';
-import { MUTED, PRIMARY, TEXT } from '@/features/mentor/components/course/mentorCourseCreateStyles';
+import { CARD_SECTION_TITLE_SX, MUTED, PAGE_DESCRIPTION_SX, PAGE_TITLE_SX, PRIMARY, TEXT } from '@/features/mentor/components/course/mentorCourseCreateStyles';
 import {
   fetchCourseCategories,
   fetchCourseLevels,
+  fetchMentorCourseDetail,
   updateCourseBasicInfo,
   updateCourseContent,
 } from '@/features/mentor/services/mentorCourseService';
@@ -22,6 +23,7 @@ import {
 export default function MentorEditCourseReviewPage() {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [draft, setDraft] = useState(null);
   const [ready, setReady] = useState(false);
@@ -30,6 +32,13 @@ export default function MentorEditCourseReviewPage() {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
+    const stateDraft = location.state?.editDraft;
+    if (stateDraft?.course) {
+      setDraft(stateDraft);
+      setReady(true);
+      return;
+    }
+
     const saved = loadEditCourseDraft(courseId);
     if (!saved?.course) {
       toast.error('Không tìm thấy dữ liệu chỉnh sửa. Vui lòng thử lại.');
@@ -38,7 +47,7 @@ export default function MentorEditCourseReviewPage() {
     }
     setDraft(saved);
     setReady(true);
-  }, [courseId, navigate]);
+  }, [courseId, location.state, navigate]);
 
   useEffect(() => {
     if (!draft?.course) return undefined;
@@ -65,25 +74,40 @@ export default function MentorEditCourseReviewPage() {
   }, [draft]);
 
   const paths = useMemo(() => draft?.paths ?? [], [draft]);
+  const profileOnly = Boolean(draft?.meta?.profileOnly);
+  const courseForUpdate = draft?.course ?? null;
 
   const handleUpdate = async () => {
-    if (!draft?.course) return;
+    if (!courseForUpdate) return;
 
     setUpdating(true);
     try {
-      const [basicResult, contentResult] = await Promise.all([
-        updateCourseBasicInfo(courseId, draft.course),
-        updateCourseContent(courseId, paths),
-      ]);
+      const basicResult = await updateCourseBasicInfo(courseId, courseForUpdate);
 
-      if (!basicResult.ok || !contentResult.ok) {
-        toast.error('Không thể cập nhật khóa học. Vui lòng thử lại.');
+      if (!basicResult.ok) {
+        toast.error(basicResult.message || 'Không thể cập nhật khóa học. Vui lòng thử lại.');
         return;
       }
 
-      clearEditCourseDraft(courseId);
+      if (!profileOnly) {
+        const contentResult = await updateCourseContent(courseId, paths);
+        if (!contentResult.ok) {
+          toast.error(contentResult.message || 'Không thể cập nhật khóa học. Vui lòng thử lại.');
+          return;
+        }
+        clearEditCourseDraft(courseId);
+      }
+
+      const freshResult = await fetchMentorCourseDetail(courseId);
+      if (!freshResult.success) {
+        toast.warning('Đã cập nhật nhưng không thể tải lại dữ liệu mới.');
+      }
+
       toast.success('Đã cập nhật khóa học thành công.');
-      navigate(`/mentor/courses/${courseId}`);
+      navigate(`/mentor/courses/${courseId}`, {
+        replace: true,
+        state: { refreshedAt: Date.now() },
+      });
     } catch {
       toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
@@ -101,7 +125,6 @@ export default function MentorEditCourseReviewPage() {
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto' }}>
-      {/* Breadcrumbs */}
       <Breadcrumbs
         separator="/"
         sx={{ mb: 2, '& .MuiBreadcrumbs-separator': { color: MUTED, mx: 0.5 } }}
@@ -120,24 +143,15 @@ export default function MentorEditCourseReviewPage() {
         </Typography>
       </Breadcrumbs>
 
-      {/* Heading */}
-      <Typography
-        component="h1"
-        sx={{
-          fontSize: { xs: 24, sm: 28 },
-          fontWeight: 800,
-          color: TEXT,
-          letterSpacing: '-0.02em',
-          mb: 0.5,
-        }}
-      >
+      <Typography component="h1" sx={{ ...PAGE_TITLE_SX, mb: 0.5 }}>
         Xem lại thay đổi
       </Typography>
-      <Typography sx={{ fontSize: 15, color: MUTED, mb: 2.5, maxWidth: 720, lineHeight: 1.55 }}>
-        Kiểm tra các thay đổi trước khi cập nhật khóa học.
+      <Typography sx={{ ...PAGE_DESCRIPTION_SX, mb: 2.5 }}>
+        {profileOnly
+          ? 'Kiểm tra các thay đổi thông tin cơ bản trước khi cập nhật khóa học.'
+          : 'Kiểm tra các thay đổi trước khi cập nhật khóa học.'}
       </Typography>
 
-      {/* Content grid */}
       <Box
         sx={{
           display: 'grid',
@@ -147,17 +161,15 @@ export default function MentorEditCourseReviewPage() {
           mt: 0.5,
         }}
       >
-        {/* Left: info + content review */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <MentorCourseInfoReview
-            course={draft.course}
+            course={courseForUpdate}
             categoryLabel={categoryLabel}
             levelLabel={levelLabel}
           />
-          <MentorCourseContentReview paths={paths} />
+          {!profileOnly && <MentorCourseContentReview paths={paths} />}
         </Box>
 
-        {/* Right: action panel */}
         <Box
           sx={{
             bgcolor: '#FFFFFF',
@@ -169,7 +181,7 @@ export default function MentorEditCourseReviewPage() {
             top: { lg: 24 },
           }}
         >
-          <Typography sx={{ fontSize: 15, fontWeight: 800, color: TEXT, mb: 0.5 }}>
+          <Typography sx={{ ...CARD_SECTION_TITLE_SX, mb: 0.5 }}>
             Xác nhận cập nhật
           </Typography>
           <Typography sx={{ fontSize: 13, color: MUTED, mb: 2, lineHeight: 1.55 }}>
@@ -197,21 +209,28 @@ export default function MentorEditCourseReviewPage() {
             <AppButton
               variant="text"
               startIcon={<ArrowBackRoundedIcon />}
-              onClick={() => navigate(`/mentor/courses/${courseId}/content/edit`)}
+              onClick={() => navigate(
+                profileOnly
+                  ? `/mentor/courses/${courseId}/edit`
+                  : `/mentor/courses/${courseId}/content/edit`,
+                profileOnly ? { state: { editDraft: draft } } : undefined,
+              )}
               disabled={updating}
               sx={{ height: 40, borderRadius: '999px', fontWeight: 700, color: MUTED }}
             >
-              Quay lại chỉnh sửa nội dung
+              {profileOnly ? 'Quay lại chỉnh sửa thông tin' : 'Quay lại chỉnh sửa nội dung'}
             </AppButton>
 
-            <AppButton
-              variant="text"
-              onClick={() => navigate(`/mentor/courses/${courseId}/edit`)}
-              disabled={updating}
-              sx={{ height: 40, borderRadius: '999px', fontWeight: 600, color: MUTED, fontSize: 13 }}
-            >
-              Chỉnh sửa thông tin cơ bản
-            </AppButton>
+            {!profileOnly && (
+              <AppButton
+                variant="text"
+                onClick={() => navigate(`/mentor/courses/${courseId}/edit`)}
+                disabled={updating}
+                sx={{ height: 40, borderRadius: '999px', fontWeight: 600, color: MUTED, fontSize: 13 }}
+              >
+                Chỉnh sửa thông tin cơ bản
+              </AppButton>
+            )}
           </Box>
         </Box>
       </Box>

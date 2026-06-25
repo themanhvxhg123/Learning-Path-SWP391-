@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { clearAllQuestionBankCreateDrafts } from '@/features/mentor/hooks/useQuestionBankCreateBootstrap';
 
 // 1. Khởi tạo Nhà Kho
 const AuthContext = createContext();
@@ -11,7 +12,7 @@ export function AuthProvider({ children }) {
   // Lúc trang web vừa chạy lên, vào két sắt (localStorage) xem có ai đang đăng nhập không
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-        if (storedUser && storedUser !== "undefined" && storedUser !== "null") {
+    if (storedUser && storedUser !== "undefined" && storedUser !== "null") {
       try {
         setUser(JSON.parse(storedUser));
       } catch (error) {
@@ -31,6 +32,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    clearAllQuestionBankCreateDrafts();
   };
 
   return (
@@ -39,6 +41,7 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
 
 // 3. Hook để các trang khác moi dữ liệu ra dùng
 export const useAuth = () => useContext(AuthContext);

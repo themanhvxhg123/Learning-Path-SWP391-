@@ -1,7 +1,7 @@
 import { Box, Breadcrumbs, Link as MuiLink, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import MentorCourseCreateStepIndicator from './MentorCourseCreateStepIndicator';
-import { MUTED, TEXT } from './mentorCourseCreateStyles';
+import { MUTED, PAGE_DESCRIPTION_SX, PAGE_TITLE_SX, TEXT } from './mentorCourseCreateStyles';
 
 function BreadcrumbLink({ to, children, sx }) {
   const navigate = useNavigate();
@@ -50,19 +50,10 @@ export default function MentorCourseReviewHeader() {
         </Typography>
       </Breadcrumbs>
 
-      <Typography
-        component="h1"
-        sx={{
-          fontSize: { xs: 24, sm: 28 },
-          fontWeight: 800,
-          color: TEXT,
-          letterSpacing: '-0.02em',
-          mb: 0.75,
-        }}
-      >
+      <Typography component="h1" sx={{ ...PAGE_TITLE_SX, mb: 0.75 }}>
         Xem lại & tạo khóa học
       </Typography>
-      <Typography sx={{ fontSize: 15, color: MUTED, mb: 1.75, maxWidth: 720, lineHeight: 1.55 }}>
+      <Typography sx={{ ...PAGE_DESCRIPTION_SX, mb: 1.75 }}>
         Bước 3: Kiểm tra thông tin khóa học trước khi tạo (lưu dưới dạng bản nháp).
       </Typography>
 

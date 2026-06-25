@@ -1,5 +1,5 @@
 /**
- * Panel CTA bên trái — chuyển giữa 3 phần Nghe / Đọc / Từ vựng–Ngữ pháp.
+ * Panel CTA bên trái — chuyển giữa 3 phần Nghe / Đọc / Trắc nghiệm.
  */
 import { Box, Typography, alpha } from '@mui/material';
 import HeadphonesRoundedIcon from '@mui/icons-material/HeadphonesRounded';
@@ -46,14 +46,19 @@ function SkillNavButton({
   questionCount = 0,
   activeQuestionCount = 0,
   showActiveCounts = false,
+  showSectionCount = true,
   selected = false,
   disabled = false,
   hasError = false,
   onClick,
 }) {
-  const metaText = showActiveCounts && questionCount !== activeQuestionCount
-    ? `${sectionCount} ${sectionUnit} · ${activeQuestionCount}/${questionCount} câu đang dùng`
-    : `${sectionCount} ${sectionUnit} · ${questionCount} câu hỏi`;
+  const metaText = !showSectionCount
+    ? showActiveCounts && questionCount !== activeQuestionCount
+      ? `${activeQuestionCount}/${questionCount} câu đang dùng`
+      : `${questionCount} câu hỏi`
+    : showActiveCounts && questionCount !== activeQuestionCount
+      ? `${sectionCount} ${sectionUnit} · ${activeQuestionCount}/${questionCount} câu đang dùng`
+      : `${sectionCount} ${sectionUnit} · ${questionCount} câu hỏi`;
   return (
     <Box
       component="button"
@@ -184,10 +189,10 @@ export default function MentorQuestionBankSkillNav({
               icon={icon}
               color={theme.color}
               sectionCount={baiCountBySkill[skill]}
-              sectionUnit={skill === TEST_SKILL_WRITING ? 'nhóm' : 'bài'}
               questionCount={countBySkill[skill]}
               activeQuestionCount={activeCountBySkill[skill]}
               showActiveCounts={showActiveCounts}
+              showSectionCount={skill !== TEST_SKILL_WRITING}
               selected={activeSkill === skill}
               disabled={disabled}
               hasError={errorBySkill[skill]}

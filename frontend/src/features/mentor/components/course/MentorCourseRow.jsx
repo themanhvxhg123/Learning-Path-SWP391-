@@ -92,57 +92,7 @@ function getStatusChip(IsPublished) {
 }
 
 import { resolveCategoryChipSx, resolveLevelChipSx } from '@/shared/catalog/catalogRegistry';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-function getImageUrl(thumbnail) {
-  if (!thumbnail) return '';
-
-  const value = String(thumbnail).trim();
-
-  // Trường hợp ảnh đã là URL đầy đủ hoặc base64/blob
-  if (
-    value.startsWith('http://') ||
-    value.startsWith('https://') ||
-    value.startsWith('data:image') ||
-    value.startsWith('blob:')
-  ) {
-    return value;
-  }
-
-  // Trường hợp DB lưu: /assets/avatars/courses/course_avt_76.jpg
-  return `${API_URL}${value}`;
-}
-
-function CourseThumbnail({ thumbnail, courseName }) {
-  const imageUrl = getImageUrl(thumbnail);
-
-  return (
-    <Box
-      sx={{
-        width: { xs: '100%', sm: 112 },
-        height: { xs: 140, sm: 72 },
-        borderRadius: '14px',
-        flexShrink: 0,
-        overflow: 'hidden',
-        bgcolor: alpha(PRIMARY, 0.1),
-        backgroundImage: imageUrl ? `url("${imageUrl}")` : 'none',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        display: 'grid',
-        placeItems: 'center',
-      }}
-    >
-      {!imageUrl && (
-        <MenuBookOutlinedIcon sx={{ fontSize: 28, color: PRIMARY }} />
-      )}
-
-      {!imageUrl && courseName && (
-        <Typography sx={{ display: 'none' }}>{courseName}</Typography>
-      )}
-    </Box>
-  );
-}
+import ThumbnailImage from '@/shared/ui/ThumbnailImage';
 
 function MetricItem({ icon: Icon, label, value, iconColor }) {
   return (
@@ -177,7 +127,18 @@ export default function MentorCourseRow({ course }) {
         gap: { xs: 1.75, md: 2.5 },
       }}
     >
-      <CourseThumbnail thumbnail={course.Thumbnail} courseName={course.CourseName} />
+      <ThumbnailImage
+        src={course.Thumbnail}
+        label={course.CourseName}
+        alt={course.CourseName}
+        iconSize={28}
+        sx={{
+          width: { xs: '100%', sm: 112 },
+          height: { xs: 140, sm: 72 },
+          borderRadius: '14px',
+          flexShrink: 0,
+        }}
+      />
 
       <Box sx={{ flex: 1, minWidth: 0, pr: { xs: 10, md: 0 } }}>
         <MuiLink

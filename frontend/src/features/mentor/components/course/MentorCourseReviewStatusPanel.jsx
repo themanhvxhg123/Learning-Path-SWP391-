@@ -4,7 +4,7 @@ import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded';
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import MentorCourseReviewActions from './MentorCourseReviewActions';
 import { BUILDER_PANEL_SX } from './mentorCourseContentStyles';
-import { MUTED, TEXT } from './mentorCourseCreateStyles';
+import { CARD_SECTION_TITLE_SX, MUTED, TEXT } from './mentorCourseCreateStyles';
 
 function StatusIcon({ status }) {
   if (status === 'ok') {
@@ -31,7 +31,7 @@ function OverviewPill({ label, value }) {
       }}
     >
       <Typography sx={{ fontSize: 12, color: MUTED }}>{label}</Typography>
-      <Typography sx={{ fontSize: 12, fontWeight: 800, color: TEXT }}>{value}</Typography>
+      <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT }}>{value}</Typography>
     </Box>
   );
 }
@@ -66,7 +66,7 @@ export default function MentorCourseReviewStatusPanel({
       }}
     >
       <Box sx={{ ...BUILDER_PANEL_SX, p: 2 }}>
-        <Typography sx={{ fontSize: 16, fontWeight: 800, color: TEXT, mb: 1.25 }}>
+        <Typography sx={{ ...CARD_SECTION_TITLE_SX, mb: 1.25 }}>
           Trạng thái kiểm tra
         </Typography>
 

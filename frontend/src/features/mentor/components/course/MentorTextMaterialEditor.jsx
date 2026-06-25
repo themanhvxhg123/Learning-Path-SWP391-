@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
+  CircularProgress,
   Divider,
   IconButton,
   MenuItem,
@@ -21,6 +22,7 @@ import FormatAlignRightRoundedIcon from '@mui/icons-material/FormatAlignRightRou
 import FormatClearRoundedIcon from '@mui/icons-material/FormatClearRounded';
 import AppButton from '@/shared/ui/AppButton';
 import { isHtmlContentEmpty } from '@/features/mentor/utils/mentorCourseContentUtils';
+import { fetchTextMaterialHtml } from '@/features/mentor/services/materialUploadService';
 import { ContentFieldLabel } from './MentorContentSectionHeading';
 import { MUTED, TEXT } from './mentorCourseCreateStyles';
 import { MATERIAL_TYPE_THEME } from './mentorCourseContentStyles';
@@ -236,6 +238,7 @@ export default function MentorTextMaterialEditor({
   const [formats, setFormats] = useState({ ...EMPTY_FORMATS });
   const [editorEmpty, setEditorEmpty] = useState(true);
   const [editorFocused, setEditorFocused] = useState(false);
+  const [loadingRemote, setLoadingRemote] = useState(false);
   const theme = MATERIAL_TYPE_THEME.TEXT;
 
   materialTempIdRef.current = material.tempId;
@@ -379,22 +382,37 @@ export default function MentorTextMaterialEditor({
   }, []);
 
   useEffect(() => {
-    const html = material.Content || '';
-    if (editorRef.current) {
-      editorRef.current.innerHTML = html;
-      lastHtmlRef.current = cleanHtml(html);
-      updateEditorEmptyState(html);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let cancelled = false;
 
-  useEffect(() => {
-    if (material.Content === '' && lastHtmlRef.current !== '' && editorRef.current) {
-      editorRef.current.innerHTML = '';
-      lastHtmlRef.current = '';
-      updateEditorEmptyState('');
+    async function initEditorContent() {
+      let html = material.Content || '';
+
+      if (isHtmlEmpty(html) && material.MaterialUrl) {
+        setLoadingRemote(true);
+        try {
+          html = await fetchTextMaterialHtml(material.MaterialUrl);
+          if (!cancelled && html && !isHtmlEmpty(html)) {
+            onChangeRef.current(materialTempIdRef.current, { Content: html });
+          }
+        } catch {
+          /* giữ editor trống nếu không tải được */
+        } finally {
+          if (!cancelled) setLoadingRemote(false);
+        }
+      }
+
+      if (!cancelled && editorRef.current) {
+        editorRef.current.innerHTML = html || '';
+        lastHtmlRef.current = cleanHtml(html || '');
+        updateEditorEmptyState(html || '');
+      }
     }
-  }, [material.Content, updateEditorEmptyState]);
+
+    initEditorContent();
+    return () => { cancelled = true; };
+    // Chỉ khởi tạo lại khi đổi học liệu — không phụ thuộc Content để tránh reset khi gõ.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [material.tempId]);
 
   useEffect(() => {
     const onSelectionChange = () => {
@@ -623,7 +641,23 @@ export default function MentorTextMaterialEditor({
           </ContentFieldLabel>
 
           <Box sx={{ position: 'relative' }}>
-            {editorEmpty && !disabled && !editorFocused && (
+            {loadingRemote && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'rgba(255,255,255,0.72)',
+                  borderRadius: '14px',
+                }}
+              >
+                <CircularProgress size={28} sx={{ color: theme.color }} />
+              </Box>
+            )}
+            {editorEmpty && !disabled && !editorFocused && !loadingRemote && (
               <Typography
                 sx={{
                   position: 'absolute',
@@ -643,7 +677,7 @@ export default function MentorTextMaterialEditor({
             <Box
               ref={editorRef}
               component="div"
-              contentEditable={!disabled}
+              contentEditable={!disabled && !loadingRemote}
               suppressContentEditableWarning
               lang="vi"
               role="textbox"
@@ -675,14 +709,20 @@ export default function MentorTextMaterialEditor({
           <ContentFieldLabel sx={{ mb: 0.5, fontSize: 12, fontWeight: 700, color: '#64748B' }}>
             Xem trước
           </ContentFieldLabel>
-          <Box
-            sx={PREVIEW_CONTENT_SX}
-            dangerouslySetInnerHTML={{
-              __html: isHtmlEmpty(material.Content)
-                ? '<span style="color:#94A3B8">Chưa có nội dung để xem trước.</span>'
-                : material.Content,
-            }}
-          />
+          {loadingRemote ? (
+            <Box sx={{ ...PREVIEW_CONTENT_SX, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress size={28} sx={{ color: theme.color }} />
+            </Box>
+          ) : (
+            <Box
+              sx={PREVIEW_CONTENT_SX}
+              dangerouslySetInnerHTML={{
+                __html: isHtmlEmpty(material.Content)
+                  ? '<span style="color:#94A3B8">Chưa có nội dung để xem trước.</span>'
+                  : material.Content,
+              }}
+            />
+          )}
           {errors.Content && (
             <Typography sx={{ fontSize: 11, color: '#DC2626', mt: 0.35 }}>
               {errors.Content}

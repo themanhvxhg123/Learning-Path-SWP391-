@@ -93,8 +93,8 @@ export function buildQBActiveChips(filters, options = {}) {
 
 function matchesQuestionStatus(item, questionStatus) {
   if (questionStatus === 'all') return true;
-  const total = item.totalQuestionCount ?? 0;
-  const draft = item.draftQuestionCount ?? 0;
+  const total = item.TotalQuestionCount ?? 0;
+  const draft = item.DraftQuestionCount ?? 0;
   if (questionStatus === 'empty') return total === 0;
   if (questionStatus === 'has_draft') return draft > 0;
   if (questionStatus === 'all_published') return total > 0 && draft === 0;
@@ -106,21 +106,23 @@ export function filterAndSortQBItems(items, query = {}) {
   const keyword = q.trim().toLowerCase();
 
   let result = items.filter((item) => {
-    if (status !== 'all' && item.status !== status) return false;
+    if (status !== 'all' && item.Status !== status) return false;
     if (!matchesQuestionStatus(item, questionStatus)) return false;
     if (keyword) {
-      const haystack = [item.courseName, item.description].filter(Boolean).join(' ').toLowerCase();
+      const haystack = [item.CourseName, item.Description].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(keyword)) return false;
     }
     return true;
   });
 
   result = [...result].sort((a, b) => {
-    if (sort === 'name_asc') return (a.courseName ?? '').localeCompare(b.courseName ?? '', 'vi');
-    if (sort === 'questions_desc') return (b.totalQuestionCount ?? 0) - (a.totalQuestionCount ?? 0);
+    if (sort === 'name_asc') return (a.CourseName ?? '').localeCompare(b.CourseName ?? '', 'vi');
+    if (sort === 'questions_desc') {
+      return (b.TotalQuestionCount ?? 0) - (a.TotalQuestionCount ?? 0);
+    }
     return (
-      new Date(b.questionBankUpdatedAt ?? 0).getTime() -
-      new Date(a.questionBankUpdatedAt ?? 0).getTime()
+      new Date(b.QuestionBankUpdatedAt ?? 0).getTime() -
+      new Date(a.QuestionBankUpdatedAt ?? 0).getTime()
     );
   });
 

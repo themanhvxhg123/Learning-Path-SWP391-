@@ -12,6 +12,8 @@ export default function MentorCourseCreateForm({
   categoryOptions = [],
   levelOptions = [],
   optionsLoading = false,
+  lockCategoryAndLevel = false,
+  lockThumbnail = false,
   footer,
 }) {
   return (
@@ -29,7 +31,7 @@ export default function MentorCourseCreateForm({
             value={form.Thumbnail}
             error={errors.Thumbnail}
             onChange={onChange}
-            disabled={disabled}
+            disabled={disabled || lockThumbnail}
           />
 
           <MentorCourseBasicInfoForm
@@ -40,6 +42,7 @@ export default function MentorCourseCreateForm({
             categoryOptions={categoryOptions}
             levelOptions={levelOptions}
             optionsLoading={optionsLoading}
+            lockCategoryAndLevel={lockCategoryAndLevel}
           />
         </Box>
       </Box>

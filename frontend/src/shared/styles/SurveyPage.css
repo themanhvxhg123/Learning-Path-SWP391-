@@ -44,7 +44,7 @@
 
 .survey-container {
   width: 100%;
-  max-width: 900px;
+  max-width: 960px;
   background: var(--survey-container-bg);
   border-radius: 16px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
@@ -155,27 +155,36 @@
   color: var(--survey-success);
 }
 
-/* ── Tag Card Grid (3 rows of 4 columns) ─────────────────────── */
+/* ── Tag list — 1 row = 1 option ─────────────────────────────── */
 .survey-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px; /* Reduced gap for compact 100vh */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  max-height: min(420px, calc(100dvh - 300px));
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .tag-card {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px 10px 12px; /* Very compact card padding */
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: unset;
+  max-width: unset;
+  padding: 14px 18px;
   background: #ffffff;
   border: 1px solid var(--survey-border);
   border-radius: var(--survey-radius-card);
   box-shadow: var(--survey-shadow-card);
   cursor: pointer;
-  text-align: center;
+  text-align: left;
   transition:
     border-color var(--survey-transition),
     background   var(--survey-transition),
@@ -183,40 +192,34 @@
     transform    var(--survey-transition);
   user-select: none;
   outline: none;
-  min-height: 94px; /* Compact consistent height */
+  min-height: unset;
   box-sizing: border-box;
 }
 
-/* Dynamic accent coloring via CSS variables */
 .tag-card:hover:not(.tag-card--locked) {
-  border-color: var(--topic-color);
-  background: var(--topic-bg);
-  transform: translateY(-2px);
+  border-color: var(--survey-primary);
+  background: var(--survey-primary-bg);
+  transform: none;
+  box-shadow: var(--survey-shadow-hover);
 }
 
-.tag-card:hover:not(.tag-card--locked) .tag-card__icon {
-  color: var(--topic-color);
-  transform: scale(1.08);
+.tag-card:hover:not(.tag-card--locked) .tag-card__name {
+  color: var(--survey-primary);
 }
 
 .tag-card:focus-visible {
-  outline: 2px solid var(--topic-color);
+  outline: 2px solid var(--survey-primary);
   outline-offset: 1px;
 }
 
-/* Selected state with custom accent colors */
 .tag-card--selected {
-  border-color: var(--topic-color) !important;
-  background: var(--topic-bg) !important;
-  box-shadow: 0 4px 12px rgba(15,23,42,0.03);
-}
-
-.tag-card--selected .tag-card__icon {
-  color: var(--topic-color);
+  border-color: var(--survey-selected-border) !important;
+  background: var(--survey-primary-bg) !important;
+  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.12);
 }
 
 .tag-card--selected .tag-card__name {
-  color: var(--topic-color);
+  color: var(--survey-primary);
   font-weight: 700;
 }
 
@@ -264,10 +267,11 @@
 
 /* Label text */
 .tag-card__name {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--survey-text-body);
-  line-height: 1.3;
+  line-height: 1.4;
+  white-space: normal;
   transition: color var(--survey-transition);
 }
 
@@ -379,16 +383,18 @@
     padding: 20px;
   }
   .survey-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    max-width: 100%;
   }
 }
 
 @media (max-width: 480px) {
-  .survey-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .survey-title {
     font-size: 18px;
+  }
+  .tag-card {
+    padding: 12px 14px;
+  }
+  .tag-card__name {
+    font-size: 13px;
   }
 }

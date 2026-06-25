@@ -3,6 +3,8 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { useNavigate } from 'react-router-dom';
 import AppButton from '@/shared/ui/AppButton';
 import { COURSE_THUMBNAIL_ASPECT, CREATE_CARD_SX, MUTED, TEXT } from './mentorCourseCreateStyles';
+import MentorCardSectionTitle from './MentorCardSectionTitle';
+import { resolveCourseThumbnailUrl } from '@/features/mentor/utils/mentorCourseImageUtils';
 
 function InfoRow({ label, value }) {
   return (
@@ -24,38 +26,31 @@ export default function MentorCourseInfoReview({
 }) {
   const navigate = useNavigate();
   const thumbnail = String(course?.Thumbnail ?? '').trim();
+  const thumbnailUrl = resolveCourseThumbnailUrl(thumbnail);
   const isPublished = Boolean(course?.IsPublished);
 
   return (
     <Box sx={CREATE_CARD_SX}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 1.5,
-          mb: 2,
-        }}
-      >
-        <Typography sx={{ fontSize: 17, fontWeight: 800, color: TEXT }}>
-          Thông tin khóa học
-        </Typography>
-        <AppButton
-          variant="outlined"
-          startIcon={<EditOutlinedIcon sx={{ fontSize: 16 }} />}
-          onClick={() => navigate('/mentor/courses/create')}
-          sx={{
-            height: 34,
-            borderRadius: '999px',
-            fontSize: 12,
-            fontWeight: 700,
-            px: 1.5,
-            flexShrink: 0,
-          }}
-        >
-          Chỉnh sửa thông tin
-        </AppButton>
-      </Box>
+      <MentorCardSectionTitle
+        title="Thông tin khóa học"
+        action={
+          <AppButton
+            variant="outlined"
+            startIcon={<EditOutlinedIcon sx={{ fontSize: 16 }} />}
+            onClick={() => navigate('/mentor/courses/create')}
+            sx={{
+              height: 34,
+              borderRadius: '999px',
+              fontSize: 12,
+              fontWeight: 600,
+              px: 1.5,
+              flexShrink: 0,
+            }}
+          >
+            Chỉnh sửa thông tin
+          </AppButton>
+        }
+      />
 
       <Box
         sx={{
@@ -79,7 +74,7 @@ export default function MentorCourseInfoReview({
           {thumbnail ? (
             <Box
               component="img"
-              src={thumbnail}
+              src={thumbnailUrl}
               alt="Ảnh đại diện khóa học"
               sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />

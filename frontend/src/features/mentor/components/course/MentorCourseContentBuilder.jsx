@@ -5,7 +5,7 @@ import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import AppButton from '@/shared/ui/AppButton';
 import MentorChapterCard from './MentorChapterCard';
 import MentorChapterQuizSetupDialog from './MentorChapterQuizSetupDialog';
-import { MUTED, PRIMARY, TEXT } from './mentorCourseCreateStyles';
+import { CARD_SECTION_META_SX, CARD_SECTION_TITLE_SX, MUTED, PRIMARY, TEXT } from './mentorCourseCreateStyles';
 import { BUILDER_PANEL_SX, contentAddButtonSx } from './mentorCourseContentStyles';
 import { isPathSnapshotSaved, resolveChapterId } from '@/features/mentor/utils/mentorCourseContentUtils';
 
@@ -50,10 +50,10 @@ export default function MentorCourseContentBuilder({
     <>
       <Box id="content-builder-root" data-content-error="content-builder-root">
         <Box sx={{ mb: 3 }}>
-          <Typography sx={{ fontSize: 17, fontWeight: 600, color: TEXT, lineHeight: 1.35 }}>
+          <Typography sx={CARD_SECTION_TITLE_SX}>
             Nội dung khóa học
           </Typography>
-          <Typography sx={{ fontSize: 14, color: MUTED, mt: 0.5, lineHeight: 1.55, maxWidth: 520 }}>
+          <Typography sx={{ ...CARD_SECTION_META_SX, mt: 0.35, maxWidth: 520 }}>
             Tạo chương, bài học và học liệu theo đúng thứ tự học.
           </Typography>
         </Box>

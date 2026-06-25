@@ -67,8 +67,8 @@ export const getCategoriesApi = () => apiGet('/categories');
 
 export const getLevelsApi = () => apiGet('/levels');
 
-export const saveOnboardingApi = (userId, categoryId, levelId, goal) =>
-  apiAuthFetch('/onboarding', { userId, categoryId, levelId, goal });
+export const saveOnboardingApi = (userId, categoryIds, levelId, goal) =>
+  apiAuthFetch('/onboarding', { userId, categoryIds, levelId, goal });
 
 export const forgotPasswordApi = (email) => apiAuthFetch('/forgot-password', { email });
 

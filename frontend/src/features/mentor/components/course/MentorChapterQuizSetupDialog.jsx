@@ -38,11 +38,9 @@ import {
   getDefaultCourseQuizConfig,
   hasChapterQuizConfigErrors,
   syncChapterQuizConfigWithStats,
-  patchWritingSectionGroup,
   patchQuestionConfig,
   validateChapterQuizConfig,
-  getWritingQuestionCountFromGroups,
-  getWritingSectionGroupsFromConfig,
+  getQuestionCountForPart,
   aggregateCourseStatsByChapterIds,
   getSelectedChapterIdsFromConfig,
   initCourseQuizChapterSelection,
@@ -100,100 +98,6 @@ function SectionTitle({ children }) {
   );
 }
 
-function WritingSectionGroupsEditor({
-  sectionGroups = [],
-  bankGroups = [],
-  disabled = false,
-  saving = false,
-  errors = {},
-  onToggleGroup,
-  onGroupCountChange,
-}) {
-  const bankGroupMap = new Map(bankGroups.map((group) => [group.sectionTempId, group]));
-  const writingColor = TEST_SKILL_CHIP_COLORS[TEST_SKILL_WRITING].color;
-
-  if (sectionGroups.length === 0) {
-    return (
-      <Typography sx={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
-        Chưa có nhóm câu hỏi Từ vựng / Ngữ pháp trong ngân hàng.
-      </Typography>
-    );
-  }
-
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.85, mt: 1 }}>
-      {sectionGroups.map((group) => {
-        const available = bankGroupMap.get(group.sectionTempId)?.activeCount ?? 0;
-        const errorKey = `${TEST_SKILL_WRITING}.${group.sectionTempId}`;
-        const fieldError = errors[errorKey];
-        const isSelected = Boolean(group.selected);
-        const noActiveQuestions = available === 0;
-
-        return (
-          <Box
-            key={group.sectionTempId}
-            sx={{
-              p: 1,
-              borderRadius: '10px',
-              bgcolor: isSelected ? 'rgba(234,88,12,0.04)' : '#fff',
-              border: `1px solid ${fieldError ? 'rgba(220,38,38,0.35)' : 'rgba(15,23,42,0.08)'}`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
-              <Checkbox
-                size="small"
-                checked={isSelected}
-                disabled={disabled || saving || noActiveQuestions}
-                onChange={(e) => onToggleGroup(group.sectionTempId, e.target.checked)}
-                sx={{
-                  p: 0.25,
-                  mt: 0.1,
-                  color: MUTED,
-                  '&.Mui-checked': { color: writingColor },
-                }}
-              />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.4 }}>
-                  {group.sectionTitle}
-                </Typography>
-                <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.2 }}>
-                  {noActiveQuestions
-                    ? 'Không có câu đang bật trong nhóm này'
-                    : `Có ${available} câu đang bật`}
-                </Typography>
-                {isSelected && !noActiveQuestions ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.85 }}>
-                    <Typography sx={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>Lấy</Typography>
-                    <InputBase
-                      type="number"
-                      inputProps={{ min: 0, max: available }}
-                      value={group.questionCount ?? 0}
-                      onChange={(e) => onGroupCountChange(group.sectionTempId, e.target.value)}
-                      disabled={disabled || saving}
-                      sx={countInputSx(Boolean(fieldError))}
-                    />
-                    <Typography sx={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>câu</Typography>
-                  </Box>
-                ) : null}
-                {fieldError ? (
-                  <Typography sx={{ fontSize: 11, color: '#DC2626', mt: 0.75, lineHeight: 1.45 }}>
-                    {fieldError}
-                  </Typography>
-                ) : null}
-              </Box>
-            </Box>
-          </Box>
-        );
-      })}
-      {errors[`${TEST_SKILL_WRITING}._groups`] ? (
-        <Typography sx={{ fontSize: 11, color: '#DC2626', lineHeight: 1.45 }}>
-          {errors[`${TEST_SKILL_WRITING}._groups`]}
-        </Typography>
-      ) : null}
-    </Box>
-  );
-}
-
 function CourseChapterSelector({
   chapters = [],
   selectedChapterIds = [],
@@ -215,7 +119,7 @@ function CourseChapterSelector({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mb: 2 }}>
       {chapters.map((chapter, chapterIndex) => {
-        const chapterId = String(chapter.chapterId);
+        const chapterId = String(chapter.PathId);
         const isSelected = selected.has(chapterId);
         const noBank = !chapter.hasBank;
 
@@ -234,7 +138,7 @@ function CourseChapterSelector({
                 size="small"
                 checked={isSelected}
                 disabled={disabled || saving || noBank}
-                onChange={(e) => onToggleChapter(chapter.chapterId, e.target.checked)}
+                onChange={(e) => onToggleChapter(chapter.PathId, e.target.checked)}
                 sx={{
                   p: 0.25,
                   mt: 0.1,
@@ -244,7 +148,7 @@ function CourseChapterSelector({
               />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.4 }}>
-                  Chương {chapterIndex + 1}: {chapter.chapterTitle}
+                  Chương {chapterIndex + 1}: {chapter.PathName}
                 </Typography>
                 <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.2 }}>
                   {noBank
@@ -398,29 +302,9 @@ export default function MentorChapterQuizSetupDialog({
       const next = { ...prev };
       delete next[part];
       delete next._total;
-      return next;
-    });
-  };
-
-  const handleWritingGroupToggle = (sectionTempId, selected) => {
-    setConfig((prev) => patchWritingSectionGroup(prev, sectionTempId, { selected }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[`${TEST_SKILL_WRITING}.${sectionTempId}`];
-      delete next[`${TEST_SKILL_WRITING}._groups`];
-      delete next._total;
-      return next;
-    });
-  };
-
-  const handleWritingGroupCountChange = (sectionTempId, rawValue) => {
-    setConfig((prev) =>
-      patchWritingSectionGroup(prev, sectionTempId, { questionCount: rawValue }),
-    );
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[`${TEST_SKILL_WRITING}.${sectionTempId}`];
-      delete next._total;
+      Object.keys(next)
+        .filter((key) => key.startsWith(`${TEST_SKILL_WRITING}.`))
+        .forEach((key) => delete next[key]);
       return next;
     });
   };
@@ -445,9 +329,6 @@ export default function MentorChapterQuizSetupDialog({
       return next;
     });
   };
-
-  const writingSectionGroups = getWritingSectionGroupsFromConfig(config ?? {});
-  const writingTotal = getWritingQuestionCountFromGroups(writingSectionGroups);
 
   const handleCreateQuestionBank = () => {
     onClose?.();
@@ -741,11 +622,8 @@ export default function MentorChapterQuizSetupDialog({
               {CHAPTER_QUIZ_SKILLS.map((part) => {
                 const chip = TEST_SKILL_CHIP_COLORS[part];
                 const available = stats?.questionCountBySkill?.[part] ?? 0;
-                const isWriting = part === TEST_SKILL_WRITING;
-                const count = isWriting
-                  ? writingTotal
-                  : (config?.questionConfigs?.find((item) => item.part === part)?.questionCount ?? 0);
-                const fieldError = isWriting ? errors[`${TEST_SKILL_WRITING}._groups`] : errors[part];
+                const count = getQuestionCountForPart(config ?? {}, part);
+                const fieldError = errors[part];
 
                 return (
                   <Box
@@ -767,39 +645,24 @@ export default function MentorChapterQuizSetupDialog({
                       </Typography>
                       <Typography sx={{ fontSize: 12, color: MUTED, mt: 0.25 }}>
                         Có {available} câu đang bật
-                        {isWriting && writingTotal > 0 ? ` · đã chọn ${writingTotal} câu` : ''}
                       </Typography>
 
-                      {isWriting ? (
-                        <WritingSectionGroupsEditor
-                          sectionGroups={writingSectionGroups}
-                          bankGroups={stats?.writingSectionGroups ?? []}
-                          disabled={!config?.enabled || !courseHasSelectedChapters}
-                          saving={saving}
-                          errors={errors}
-                          onToggleGroup={handleWritingGroupToggle}
-                          onGroupCountChange={handleWritingGroupCountChange}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                        <Typography sx={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>Lấy</Typography>
+                        <InputBase
+                          type="number"
+                          inputProps={{ min: 0, max: available }}
+                          value={count}
+                          onChange={(e) => handleSkillCountChange(part, e.target.value)}
+                          disabled={saving || !config?.enabled || !courseHasSelectedChapters}
+                          sx={countInputSx(Boolean(fieldError))}
                         />
-                      ) : (
-                        <>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                            <Typography sx={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>Lấy</Typography>
-                            <InputBase
-                              type="number"
-                              inputProps={{ min: 0, max: available }}
-                              value={count}
-                              onChange={(e) => handleSkillCountChange(part, e.target.value)}
-                              disabled={saving || !config?.enabled || !courseHasSelectedChapters}
-                              sx={countInputSx(Boolean(fieldError))}
-                            />
-                            <Typography sx={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>câu</Typography>
-                          </Box>
-                          {fieldError && (
-                            <Typography sx={{ fontSize: 11, color: '#DC2626', mt: 0.75, lineHeight: 1.45 }}>
-                              {fieldError}
-                            </Typography>
-                          )}
-                        </>
+                        <Typography sx={{ fontSize: 12, color: MUTED, flexShrink: 0 }}>câu</Typography>
+                      </Box>
+                      {fieldError && (
+                        <Typography sx={{ fontSize: 11, color: '#DC2626', mt: 0.75, lineHeight: 1.45 }}>
+                          {fieldError}
+                        </Typography>
                       )}
                     </Box>
                   </Box>

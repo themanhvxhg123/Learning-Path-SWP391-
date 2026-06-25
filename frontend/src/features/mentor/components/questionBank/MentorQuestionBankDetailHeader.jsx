@@ -22,12 +22,34 @@ import AppButton from '@/shared/ui/AppButton';
 import MentorChapterCardMenu from '@/features/mentor/components/course/MentorChapterCardMenu';
 import { MUTED, PRIMARY, TEXT } from '@/features/mentor/components/course/mentorCourseCreateStyles';
 import { formatMentorCourseDate } from '@/features/mentor/utils/mentorCourseUtils';
+import ThumbnailImage from '@/shared/ui/ThumbnailImage';
+import { resolveLevelChipSx } from '@/shared/catalog/catalogRegistry';
 import {
   TEST_SKILL_LABELS,
   TEST_SKILL_LISTENING,
   TEST_SKILL_READING,
   TEST_SKILL_WRITING,
 } from '@/features/mentor/utils/mentorTestContentUtils';
+
+const CREATE_BREADCRUMB_LINK_SX = {
+  fontSize: 13,
+  color: TEXT,
+  fontWeight: 500,
+  textDecoration: 'none',
+  whiteSpace: 'nowrap',
+  '&:hover': {
+    color: PRIMARY,
+    textDecoration: 'underline',
+    filter: 'brightness(1.08)',
+  },
+};
+
+const CREATE_BREADCRUMB_CURRENT_SX = {
+  fontSize: 13,
+  color: TEXT,
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+};
 
 const PILL_CHIP_SX = {
   borderRadius: '999px',
@@ -55,6 +77,7 @@ export default function MentorQuestionBankDetailHeader({
   courseName = '',
   courseId = null,
   courseCategory = '',
+  course = null,
   chapterTitle = '',
   coursePublished = false,
   totalQuestionCount = 0,
@@ -90,6 +113,25 @@ export default function MentorQuestionBankDetailHeader({
   const breadcrumbLabel = isCreateMode && !bankTitle ? 'Tạo mới' : displayTitle;
 
   const showDates = Boolean(createdAt || updatedAt);
+
+  const resolvedCourseName = isCreateMode
+    ? (courseName || course?.CourseName || '')
+    : (courseName || course?.CourseName || course?.courseName || '');
+  const categoryLabel = isCreateMode
+    ? (course?.CategoryDisplayName ?? '')
+    : (course?.CategoryDisplayName ?? course?.categoryDisplayName ?? course?.CategoryName ?? course?.categoryName ?? '');
+  const levelDisplayName = isCreateMode
+    ? (course?.LevelDisplayName ?? '')
+    : (course?.LevelDisplayName ?? course?.levelDisplayName ?? '');
+  const resolvedCategory =
+    courseCategory ||
+    [categoryLabel, isCreateMode ? '' : levelDisplayName].filter(Boolean).join(' · ');
+  const levelChipSx = levelDisplayName
+    ? resolveLevelChipSx({
+        id: course?.LevelId,
+        displayName: course?.LevelName ?? levelDisplayName,
+      })
+    : null;
 
   const statItems = [
     {
@@ -133,16 +175,84 @@ export default function MentorQuestionBankDetailHeader({
       <Box
         sx={{
           display: 'flex',
-          alignItems: { xs: 'stretch', sm: 'center' },
+          alignItems: isCreateMode ? 'center' : { xs: 'stretch', sm: 'center' },
           justifyContent: 'space-between',
-          flexDirection: { xs: 'column', sm: 'row' },
-          gap: { xs: 1.5, sm: 2 },
+          flexDirection: isCreateMode ? 'row' : { xs: 'column', sm: 'row' },
+          flexWrap: 'nowrap',
+          gap: isCreateMode ? 2 : { xs: 1.5, sm: 2 },
           mb: 1.25,
         }}
       >
+        {isCreateMode ? (
+          <Box
+            component="nav"
+            aria-label="breadcrumb"
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'nowrap',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            <MuiLink
+              component={Link}
+              to="/home"
+              underline="none"
+              sx={{ ...CREATE_BREADCRUMB_LINK_SX, flexShrink: 0 }}
+            >
+              Trang chủ
+            </MuiLink>
+            <Box component="span" sx={{ color: TEXT, mx: 0.5, flexShrink: 0 }}>
+              /
+            </Box>
+            <MuiLink
+              component={Link}
+              to={courseId ? `/mentor/courses/${courseId}` : '/mentor/courses'}
+              underline="none"
+              sx={{
+                ...CREATE_BREADCRUMB_LINK_SX,
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+              title={resolvedCourseName || undefined}
+            >
+              {resolvedCourseName || (courseId ? `Khóa học #${courseId}` : 'Khóa học')}
+            </MuiLink>
+            <Box component="span" sx={{ color: TEXT, mx: 0.5, flexShrink: 0 }}>
+              /
+            </Box>
+            <MuiLink
+              component={Link}
+              to={courseId ? backPath : '/mentor/question-banks'}
+              underline="none"
+              sx={{ ...CREATE_BREADCRUMB_LINK_SX, flexShrink: 0 }}
+            >
+              Ngân hàng câu hỏi
+            </MuiLink>
+            <Box component="span" sx={{ color: TEXT, mx: 0.5, flexShrink: 0 }}>
+              /
+            </Box>
+            <Typography component="span" sx={{ ...CREATE_BREADCRUMB_CURRENT_SX, flexShrink: 0 }}>
+              Tạo mới
+            </Typography>
+          </Box>
+        ) : (
         <Breadcrumbs
           separator="/"
-          sx={{ '& .MuiBreadcrumbs-separator': { color: MUTED, mx: 0.5 } }}
+          sx={{
+            flexWrap: 'wrap',
+            rowGap: 0.5,
+            minWidth: 0,
+            flex: 1,
+            '& .MuiBreadcrumbs-separator': { color: MUTED, mx: 0.5 },
+            '& .MuiBreadcrumbs-li': {
+              maxWidth: { xs: '100%', sm: 'none' },
+            },
+          }}
         >
           <MuiLink
             component={Link}
@@ -152,47 +262,50 @@ export default function MentorQuestionBankDetailHeader({
           >
             Trang chủ
           </MuiLink>
-          {courseId ? (
-            <>
-              <MuiLink
-                component={Link}
-                to="/mentor/courses"
-                underline="hover"
-                sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
-              >
-                Khóa học của tôi
-              </MuiLink>
-              <MuiLink
-                component={Link}
-                to={`/mentor/courses/${courseId}`}
-                underline="hover"
-                sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
-              >
-                {courseName || `Khóa học #${courseId}`}
-              </MuiLink>
-              <MuiLink
-                component={Link}
-                to={backPath}
-                underline="hover"
-                sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
-              >
-                Ngân hàng câu hỏi
-              </MuiLink>
+          <>
+              {courseId ? (
+                <>
+                  <MuiLink
+                    component={Link}
+                    to="/mentor/courses"
+                    underline="hover"
+                    sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
+                  >
+                    Khóa học của tôi
+                  </MuiLink>
+                  <MuiLink
+                    component={Link}
+                    to={`/mentor/courses/${courseId}`}
+                    underline="hover"
+                    sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
+                  >
+                    {courseName || `Khóa học #${courseId}`}
+                  </MuiLink>
+                  <MuiLink
+                    component={Link}
+                    to={backPath}
+                    underline="hover"
+                    sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
+                  >
+                    Ngân hàng câu hỏi
+                  </MuiLink>
+                </>
+              ) : (
+                <MuiLink
+                  component={Link}
+                  to="/mentor/question-banks"
+                  underline="hover"
+                  sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
+                >
+                  Ngân hàng câu hỏi
+                </MuiLink>
+              )}
+              <Typography sx={{ fontSize: 13, color: TEXT, fontWeight: 600 }} noWrap>
+                {breadcrumbLabel}
+              </Typography>
             </>
-          ) : (
-            <MuiLink
-              component={Link}
-              to="/mentor/question-banks"
-              underline="hover"
-              sx={{ fontSize: 13, color: MUTED, fontWeight: 500 }}
-            >
-              Ngân hàng câu hỏi
-            </MuiLink>
-          )}
-          <Typography sx={{ fontSize: 13, color: TEXT, fontWeight: 600 }} noWrap>
-            {breadcrumbLabel}
-          </Typography>
         </Breadcrumbs>
+        )}
 
         <AppButton
           variant="outlined"
@@ -205,7 +318,7 @@ export default function MentorQuestionBankDetailHeader({
             fontWeight: 600,
             borderRadius: '999px',
             flexShrink: 0,
-            width: { xs: '100%', sm: 'auto' },
+            width: isCreateMode ? 'auto' : { xs: '100%', sm: 'auto' },
             color: TEXT,
             borderColor: 'rgba(15,23,42,0.12)',
           }}
@@ -231,21 +344,38 @@ export default function MentorQuestionBankDetailHeader({
             gap: 2,
           }}
         >
-          <Box
-            sx={{
-              width: { xs: '100%', md: 52 },
-              height: { xs: 8, md: 52 },
-              borderRadius: { xs: '999px', md: '14px' },
-              flexShrink: 0,
-              bgcolor: alpha(PRIMARY, 0.12),
-              display: { xs: 'block', md: 'grid' },
-              placeItems: 'center',
-            }}
-          >
-            <QuizOutlinedIcon
-              sx={{ fontSize: 24, color: PRIMARY, display: { xs: 'none', md: 'block' } }}
+          {isCreateMode && course ? (
+            <ThumbnailImage
+              src={course.Thumbnail}
+              label={resolvedCourseName}
+              alt={resolvedCourseName}
+              cacheKey={course.UpdatedAt}
+              icon={QuizOutlinedIcon}
+              iconSize={24}
+              sx={{
+                width: { xs: '100%', md: 52 },
+                height: { xs: 120, md: 52 },
+                borderRadius: '14px',
+                flexShrink: 0,
+              }}
             />
-          </Box>
+          ) : (
+            <Box
+              sx={{
+                width: { xs: '100%', md: 52 },
+                height: { xs: 8, md: 52 },
+                borderRadius: { xs: '999px', md: '14px' },
+                flexShrink: 0,
+                bgcolor: alpha(PRIMARY, 0.12),
+                display: { xs: 'block', md: 'grid' },
+                placeItems: 'center',
+              }}
+            >
+              <QuizOutlinedIcon
+                sx={{ fontSize: 24, color: PRIMARY, display: { xs: 'none', md: 'block' } }}
+              />
+            </Box>
+          )}
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Box
@@ -301,24 +431,38 @@ export default function MentorQuestionBankDetailHeader({
 
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, mb: 1.25 }}>
               <MenuBookRoundedIcon sx={{ fontSize: 17, color: PRIMARY, mt: 0.15, flexShrink: 0 }} />
-              <Typography sx={{ fontSize: 14, color: MUTED, lineHeight: 1.55 }}>
-                Khóa học:{' '}
-                <Box component="span" sx={{ fontWeight: 700, color: TEXT }}>
-                  {courseName || '—'}
-                </Box>
-                {courseCategory ? (
-                  <>
-                    {' · '}
-                    <Box component="span" sx={{ fontWeight: 500 }}>
-                      {courseCategory}
-                    </Box>
-                  </>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: 14, color: MUTED, lineHeight: 1.55 }}>
+                  Khóa học:{' '}
+                  <Box component="span" sx={{ fontWeight: 700, color: TEXT }}>
+                    {resolvedCourseName || '—'}
+                  </Box>
+                  {categoryLabel ? (
+                    <>
+                      {' · '}
+                      <Box component="span" sx={{ fontWeight: 500 }}>
+                        {categoryLabel}
+                      </Box>
+                    </>
+                  ) : resolvedCategory && !categoryLabel ? (
+                    <>
+                      {' · '}
+                      <Box component="span" sx={{ fontWeight: 500 }}>
+                        {resolvedCategory}
+                      </Box>
+                    </>
+                  ) : null}
+                  {' · Chương: '}
+                  <Box component="span" sx={{ fontWeight: 700, color: TEXT }}>
+                    {chapterTitle || '—'}
+                  </Box>
+                </Typography>
+                {levelDisplayName && levelChipSx ? (
+                  <Box sx={{ mt: 0.75 }}>
+                    <Chip size="small" label={levelDisplayName} sx={{ ...PILL_CHIP_SX, ...levelChipSx }} />
+                  </Box>
                 ) : null}
-                {' · Chương: '}
-                <Box component="span" sx={{ fontWeight: 700, color: TEXT }}>
-                  {chapterTitle || '—'}
-                </Box>
-              </Typography>
+              </Box>
             </Box>
 
             <Box

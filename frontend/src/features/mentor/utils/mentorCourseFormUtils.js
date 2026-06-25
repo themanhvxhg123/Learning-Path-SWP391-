@@ -26,7 +26,11 @@ export function isMentorCourseFormDirty(form) {
 }
 
 // VALID mentor course's form when create new course
-export function validateMentorCourseForm(form) {
+export function validateMentorCourseForm(form, options = {}) {
+  const {
+    skipCategoryLevel = false,
+    skipThumbnail = false,
+  } = options;
   const errors = {};
 
   const courseName = String(form.CourseName ?? '').trim();
@@ -54,24 +58,26 @@ export function validateMentorCourseForm(form) {
   }
 
   // Danh mục
-  if (form.CategoryId === '' || form.CategoryId === null || form.CategoryId === undefined) {
+  if (!skipCategoryLevel && (form.CategoryId === '' || form.CategoryId === null || form.CategoryId === undefined)) {
     errors.CategoryId = 'Vui lòng chọn danh mục cho khóa học của bạn';
   }
 
   // Level
-  if (form.LevelId === '' || form.LevelId === null || form.LevelId === undefined) {
+  if (!skipCategoryLevel && (form.LevelId === '' || form.LevelId === null || form.LevelId === undefined)) {
     errors.LevelId = 'Vui lòng chọn Level cho khóa học của bạn';
   }
 
   // Thumbnail
-  if (!thumbnail) {
-    errors.Thumbnail = 'Vui lòng tải lên ảnh khóa học của bạn.';
-  } else {
-    const thumbnailError = validateThumbnailDataUrl(thumbnail);
-    if (thumbnailError) {
-      errors.Thumbnail = thumbnailError;
-    } else if (!isValidThumbnailValue(thumbnail)) {
-      errors.Thumbnail = 'Ảnh không hợp lệ.';
+  if (!skipThumbnail) {
+    if (!thumbnail) {
+      errors.Thumbnail = 'Vui lòng tải lên ảnh khóa học của bạn.';
+    } else {
+      const thumbnailError = validateThumbnailDataUrl(thumbnail);
+      if (thumbnailError) {
+        errors.Thumbnail = thumbnailError;
+      } else if (!isValidThumbnailValue(thumbnail)) {
+        errors.Thumbnail = 'Ảnh không hợp lệ.';
+      }
     }
   }
 

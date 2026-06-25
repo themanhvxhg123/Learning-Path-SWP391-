@@ -63,7 +63,7 @@ export const CONTENT_CARD_META_SX = {
 };
 
 export const CONTENT_CARD_TITLE_SX = {
-  fontSize: 15,
+  fontSize: 14,
   fontWeight: 600,
   color: TEXT,
   lineHeight: 1.35,

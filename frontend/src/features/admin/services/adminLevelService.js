@@ -1,134 +1,63 @@
-import { adminLevelsSeed } from '@/features/admin/data/adminLevelsMock';
-import { normalizeLevel } from '@/features/admin/utils/adminLevelUtils';
-import { pickNextColorCode } from '@/shared/catalog/catalogColorPalette';
+/**
+ * Admin Level Service — calls real backend APIs.
+ */
+import { apiGet, apiPost, apiPut, apiDelete } from '@/features/admin/services/adminApiClient';
+import { resolveSeedColorCode } from '@/shared/catalog/catalogColorPalette';
 
-const STORAGE_KEY = 'admin_levels_v1';
-
-function loadStored() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(normalizeLevel) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveStored(items) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  } catch {
-    // ignore
-  }
-}
-
-function getAll() {
-  const stored = loadStored();
-  if (stored) return stored;
-  return adminLevelsSeed.map(normalizeLevel);
-}
-
-function nextId(items) {
-  return items.reduce((max, item) => (item.id > max ? item.id : max), 0) + 1;
-}
-
-function nextSortOrder(items) {
-  if (items.length === 0) return 1;
-  return Math.max(...items.map((item) => item.sortOrder ?? 0)) + 1;
-}
-
-function normalizeDisplayName(value = '') {
-  return String(value).trim().toLowerCase();
-}
-
-function slugifyDisplayName(value = '') {
-  return (
-    String(value)
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || `level-${Date.now()}`
-  );
-}
-
-function uniqueLevelSlug(items, displayName, excludeId = null) {
-  let base = slugifyDisplayName(displayName);
-  let slug = base;
-  let counter = 2;
-  while (
-    items.some(
-      (item) =>
-        item.levelName === slug &&
-        (excludeId == null || String(item.id) !== String(excludeId)),
-    )
-  ) {
-    slug = `${base}-${counter}`;
-    counter += 1;
-  }
-  return slug;
-}
-
-function simulateDelay(ms = 180) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Map a backend level record to the frontend shape.
+ * Backend returns: LevelId, LevelName, DisplayName, SortOrder, CreatedAt
+ */
+function mapLevel(raw) {
+  return {
+    id: raw.LevelId,
+    levelName: raw.LevelName || '',
+    displayName: raw.DisplayName || '',
+    sortOrder: Number(raw.SortOrder) || 0,
+    colorCode: raw.ColorCode || resolveSeedColorCode('level', raw.LevelId) || null,
+    status: raw.Status || 'ACTIVE',
+    createdAt: raw.CreatedAt || null,
+  };
 }
 
 export async function getLevels() {
-  await simulateDelay();
-  return { ok: true, levels: getAll() };
+  const res = await apiGet('/levels');
+  if (!res.ok) return { ok: false, levels: [] };
+  const levels = (res.data || []).map(mapLevel);
+  return { ok: true, levels };
 }
 
 export async function createLevel(payload) {
-  await simulateDelay();
-  const items = getAll();
-  const displayName = String(payload.displayName ?? '').trim();
-
-  if (items.some((item) => normalizeDisplayName(item.displayName) === normalizeDisplayName(displayName))) {
-    return { ok: false, message: 'Tên trình độ đã tồn tại' };
-  }
-
-  const created = normalizeLevel({
-    id: nextId(items),
-    levelName: uniqueLevelSlug(items, displayName),
-    displayName,
-    sortOrder: nextSortOrder(items),
-    colorCode: pickNextColorCode(items),
-    status: payload.status ?? 'ACTIVE',
-    createdAt: new Date().toISOString(),
+  const res = await apiPost('/levels', {
+    LevelName: payload.levelName || payload.displayName?.toLowerCase().replace(/\s+/g, '-') || '',
+    DisplayName: payload.displayName,
+    SortOrder: payload.sortOrder || 1,
   });
-
-  saveStored([...items, created]);
-  return { ok: true, level: created };
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể tạo trình độ' };
+  }
+  return { ok: true, level: mapLevel(res.data) };
 }
 
 export async function updateLevel(id, payload) {
-  await simulateDelay();
-  const items = getAll();
-  const index = items.findIndex((item) => String(item.id) === String(id));
-  if (index < 0) return { ok: false, message: 'Không tìm thấy trình độ' };
-
-  const displayName = String(payload.displayName ?? items[index].displayName).trim();
-  if (
-    items.some(
-      (item, i) =>
-        i !== index && normalizeDisplayName(item.displayName) === normalizeDisplayName(displayName),
-    )
-  ) {
-    return { ok: false, message: 'Tên trình độ đã tồn tại' };
-  }
-
-  const updated = normalizeLevel({
-    ...items[index],
-    displayName,
-    levelName: uniqueLevelSlug(items, displayName, id),
-    colorCode: items[index].colorCode ?? pickNextColorCode(items),
-    status: payload.status ?? items[index].status,
+  const res = await apiPut(`/levels/${id}`, {
+    LevelName: payload.levelName || payload.displayName?.toLowerCase().replace(/\s+/g, '-') || '',
+    DisplayName: payload.displayName,
+    SortOrder: payload.sortOrder || 1,
   });
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể cập nhật trình độ' };
+  }
+  // Re-fetch to get updated data
+  const fetchRes = await getLevels();
+  const updated = (fetchRes.levels || []).find((l) => String(l.id) === String(id));
+  return { ok: true, level: updated || null };
+}
 
-  const next = [...items];
-  next[index] = updated;
-  saveStored(next);
-  return { ok: true, level: updated };
+export async function deleteLevel(id) {
+  const res = await apiDelete(`/levels/${id}`);
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể xoá trình độ' };
+  }
+  return { ok: true, message: 'Đã xoá trình độ thành công' };
 }

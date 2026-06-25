@@ -15,8 +15,7 @@ const BORDER = "rgba(255,255,255,0.08)";
 const NAV_LINKS = [
   { label: "Trang chủ", to: "/home" },
   { label: "Khóa học", to: "/courses" },
-  { label: "Lộ trình", to: null },
-  { label: "Tin tức", to: null },
+  { label: "Tin tức", to: "/news" },
 ];
 
 const SUPPORT_LINKS = [

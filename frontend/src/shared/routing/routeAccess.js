@@ -18,7 +18,7 @@ export const ADMIN_SHELL_BLOCK_REDIRECTS = {
   Student: ROLE_DEFAULT_PATHS.StudentBrowse,
 };
 
-/** Shell học viên: courses + profile (Admin được xem, Mentor bị chặn). */
+/** Shell học viên: courses (Admin được xem), profile (Student). */
 export const STUDENT_SHARED_ROUTE_REDIRECTS = {
   ...STUDENT_SHELL_BLOCK_REDIRECTS,
 };

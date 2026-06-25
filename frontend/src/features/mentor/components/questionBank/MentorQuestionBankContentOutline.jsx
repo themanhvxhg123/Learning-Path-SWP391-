@@ -171,59 +171,90 @@ export default function MentorQuestionBankContentOutline({
               <Box key={skill} sx={{ mb: 0.35 }}>
                 <OutlineNavItem
                   label={TEST_SKILL_LABELS[skill]}
-                  meta={`${skillSections.length} bài · ${questionCount} câu`}
+                  meta={
+                    skill === TEST_SKILL_WRITING
+                      ? `${questionCount} câu`
+                      : `${skillSections.length} bài · ${questionCount} câu`
+                  }
                   icon={Icon}
                   iconColor={theme?.color ?? PRIMARY}
                   selected={activeSkill === skill}
                   onClick={() => handleNavigate({ type: 'skill', skill })}
                 />
 
-                {skillSections.map((section) => {
-                  const questions = getFilledTestQuestions(section?.Questions ?? []);
-                  const sectionLabel = getQuestionBankSectionTabLabel(section, sections);
-                  const isSectionActive =
-                    activeSkill === skill && String(activeSectionId) === String(section.tempId);
+                {skill === TEST_SKILL_WRITING
+                  ? (() => {
+                      const writingQuestions = skillSections.flatMap((section) =>
+                        getFilledTestQuestions(section?.Questions ?? []),
+                      );
+                      const writingSectionId = skillSections[0]?.tempId;
 
-                  return (
-                    <Box key={section.tempId}>
-                      <OutlineNavItem
-                        label={sectionLabel}
-                        meta={`${questions.length} câu hỏi`}
-                        icon={MenuBookRoundedIcon}
-                        iconColor={theme?.color ?? PRIMARY}
-                        indent={1}
-                        selected={isSectionActive}
-                        onClick={() =>
-                          handleNavigate({
-                            type: 'section',
-                            skill,
-                            sectionTempId: section.tempId,
-                          })
-                        }
-                      />
-
-                      {questions.map((question, questionIndex) => (
+                      return writingQuestions.map((question, questionIndex) => (
                         <OutlineNavItem
                           key={question.tempId}
                           label={`Câu ${questionIndex + 1}: ${truncateQuestionLabel(question.QuestionText)}`}
                           meta={!isQuestionActive(question) ? 'Ẩn khỏi quiz mới' : undefined}
                           icon={null}
                           iconColor={theme?.color ?? PRIMARY}
-                          indent={2}
+                          indent={1}
                           muted={!isQuestionActive(question)}
                           onClick={() =>
                             handleNavigate({
                               type: 'question',
                               skill,
-                              sectionTempId: section.tempId,
+                              sectionTempId: writingSectionId,
                               questionTempId: question.tempId,
                             })
                           }
                         />
-                      ))}
-                    </Box>
-                  );
-                })}
+                      ));
+                    })()
+                  : skillSections.map((section) => {
+                      const questions = getFilledTestQuestions(section?.Questions ?? []);
+                      const sectionLabel = getQuestionBankSectionTabLabel(section, sections);
+                      const isSectionActive =
+                        activeSkill === skill && String(activeSectionId) === String(section.tempId);
+
+                      return (
+                        <Box key={section.tempId}>
+                          <OutlineNavItem
+                            label={sectionLabel}
+                            meta={`${questions.length} câu hỏi`}
+                            icon={MenuBookRoundedIcon}
+                            iconColor={theme?.color ?? PRIMARY}
+                            indent={1}
+                            selected={isSectionActive}
+                            onClick={() =>
+                              handleNavigate({
+                                type: 'section',
+                                skill,
+                                sectionTempId: section.tempId,
+                              })
+                            }
+                          />
+
+                          {questions.map((question, questionIndex) => (
+                            <OutlineNavItem
+                              key={question.tempId}
+                              label={`Câu ${questionIndex + 1}: ${truncateQuestionLabel(question.QuestionText)}`}
+                              meta={!isQuestionActive(question) ? 'Ẩn khỏi quiz mới' : undefined}
+                              icon={null}
+                              iconColor={theme?.color ?? PRIMARY}
+                              indent={2}
+                              muted={!isQuestionActive(question)}
+                              onClick={() =>
+                                handleNavigate({
+                                  type: 'question',
+                                  skill,
+                                  sectionTempId: section.tempId,
+                                  questionTempId: question.tempId,
+                                })
+                              }
+                            />
+                          ))}
+                        </Box>
+                      );
+                    })}
               </Box>
             );
           })}

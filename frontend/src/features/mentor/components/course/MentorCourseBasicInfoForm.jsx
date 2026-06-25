@@ -1,4 +1,4 @@
-import { Box, InputBase, Typography } from '@mui/material';
+import { Alert, Box, InputBase, Typography } from '@mui/material';
 import { MENTOR_COURSE_DESCRIPTION_MAX, MENTOR_COURSE_NAME_MAX } from '@/features/mentor/utils/mentorCourseFormUtils';
 import { contentInputSx } from './mentorCourseContentStyles';
 import { MUTED, SECTION_TITLE_SX, TEXT } from './mentorCourseCreateStyles';
@@ -107,12 +107,19 @@ export default function MentorCourseBasicInfoForm({
   categoryOptions = [],
   levelOptions = [],
   optionsLoading = false,
+  lockCategoryAndLevel = false,
 }) {
   return (
     <Box>
       <Typography sx={{ ...SECTION_TITLE_SX, fontSize: 14, fontWeight: 600, mb: 2 }}>
         Thông tin cơ bản
       </Typography>
+
+      {lockCategoryAndLevel && (
+        <Alert severity="info" sx={{ mb: 2, fontSize: 13 }}>
+          Khóa học đã có học viên đăng ký. Bạn chỉ có thể chỉnh sửa tên và mô tả.
+        </Alert>
+      )}
 
       <FormField
         label="Tên khóa học"
@@ -138,7 +145,7 @@ export default function MentorCourseBasicInfoForm({
           value={form.CategoryId}
           error={errors.CategoryId}
           onChange={onChange}
-          disabled={disabled || optionsLoading}
+          disabled={disabled || optionsLoading || lockCategoryAndLevel}
           type="select"
           selectOptions={categoryOptions}
           placeholder={optionsLoading ? 'Đang tải...' : 'Chọn danh mục'}
@@ -149,7 +156,7 @@ export default function MentorCourseBasicInfoForm({
           value={form.LevelId}
           error={errors.LevelId}
           onChange={onChange}
-          disabled={disabled || optionsLoading}
+          disabled={disabled || optionsLoading || lockCategoryAndLevel}
           type="select"
           selectOptions={levelOptions}
           placeholder={optionsLoading ? 'Đang tải...' : 'Chọn trình độ'}
