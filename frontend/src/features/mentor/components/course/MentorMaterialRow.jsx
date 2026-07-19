@@ -194,18 +194,20 @@ export default function MentorMaterialRow({
               <DragIndicatorRoundedIcon sx={{ fontSize: 20 }} />
             </Box>
           ) : null}
-          <IconButton
-            size="small"
-            onClick={() => onDelete(material.tempId)}
-            disabled={disabled}
-            aria-label="Xóa học liệu"
-            sx={DELETE_ICON_BTN_SX}
-          >
-            <DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} />
-          </IconButton>
+          {onDelete ? (
+            <IconButton
+              size="small"
+              onClick={() => onDelete(material.tempId)}
+              disabled={disabled}
+              aria-label="Xóa học liệu"
+              sx={DELETE_ICON_BTN_SX}
+            >
+              <DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} />
+            </IconButton>
+          ) : null}
         </Box>
       </Box>
-      ) : hideDelete ? null : (
+      ) : (hideDelete || !onDelete) ? null : (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: tabMode ? 0.5 : 1 }}>
           <IconButton
             size="small"

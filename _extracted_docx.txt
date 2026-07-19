@@ -1,0 +1,94 @@
+Thuật toán đề xuất câu hỏi
+
+Nghe/Đọc : chương sai nhiều được phân bổ nhiều section/bài nghe/bài đọc hơn; không cần xác định mỗi section lấy bao nhiêu câu vì một section được lấy nguyên bài.
+RULE : Số lượng Section xuất hiện trong bài kiểm tra do mentor config phải giữ nguyên
+Công thức tính :
+1.Tỷ lệ sai của chương = tổng câu sai / tổng câu hỏi trong chương
+2.Lượng Section của chương xuất hiện trong lần làm tiếp theo = Tỷ lệ sai của chương đó / Tổng tỷ lệ sai của tất cả các chương * Tổng section xuất hiện do mentor config
+=&gt; Kết quả được làm tròn tới số gần nhất 
+Trường hợp 1 : Tất cả các chương có tỷ lệ sai = nhau : 
+
+Giữ nguyên config ban đầu của Mentor 
+
+
+
+
+
+Trường hợp 2 : Các chương có tỷ lệ sai khác nhau : 
+
+
+Kỹ năng Nghe : Gồm 5 Section (do mentor config) : Chương 1 : Weight = 7/20 = 0.35
+                          Chương 2 : Weight = 7/10 = 0.7 
+          Chương 3: Weight = 12/20 = 0.6
+Tổng Weight = 0.35 + 0.7 + 0.6 = 1.65
+Số section xuất hiện trong lần làm tiếp theo : (Làm tròn xuống) 
+Section chương 1 =  0.35 / 1.65 * 5 = ~ 1.06 = 1
+Section chương 2 =  0.7 / 1.65 * 5  = ~ 2.121 = 2
+Section chương 3 = 0.6 / 1.65 * 5 = ~ 1,81 = 1
+Tổng section hiện tại = 4 &lt; Tổng section do mentor config = 5
+Section còn thiếu sẽ cộng vào chương có Weight lớn nhất =&gt; Section chương 2 = 3
+Kết quả cuối cùng : Section chương 1 =  0.35 / 1.65 * 5 = ~ 1.06 = 1
+                                                        Section chương 2 =  0.7 / 1.65 * 5  = ~ 2.121 = 3
+           Section chương 3 = 0.6 / 1.65 * 5 = ~ 1,81 = 1
+Tổng Section sau khi áp dụng thuật toán = Tổng Section do mentor config
+
+Trường hợp 3: Có 1 chương bất kỳ có Weight = 0
+=&gt;&gt; Lần làm lại test tiếp theo sẽ không xuất hiện chương đó
+Trường hợp Exception : Sau nhiều vòng làm sẽ dẫn tới 1 trường hợp đó là các chương có tỷ lệ Weight = 0 sẽ dần biết mất, sau nhiều vòng làm sẽ chỉ còn lại DUY NHẤT các Section của 1 chương cụ thể
+=&gt;&gt; Nếu chương đó sau lần làm bài gần nhất 
+-Weight &gt; 0 =&gt; Test chỉ chứa chương đó
+-Weight = 0 =&gt; Trở lại trường hợp 1 (Tất cả các chương xuất hiện trong bài kiểm tra có Weight = 0 =&gt; lấy config ban đầu của Mentor)
+
+Từ Vựng/ Ngữ pháp: 
+RULE : -Số câu hỏi xuất hiện trong bài kiểm tra do mentor config phải giữ nguyên.
+-Số section xuất hiện trong bài kiểm tra do mentor config phải giữa nguyên.
+-Nếu chapter không đủ section trong question bank thì: Lấy toàn bộ section của chương đó. Lấy random nếu đủ section trong question bank.
+1.Tỷ lệ sai của chương = tổng câu sai / tổng câu hỏi trong chương
+
+Chương 1 : Weight = 7/13 = ~0.54
+Chương 2: Weight = 8/17 =~0.47
+Chương 3: Weight = 10/19=~0.53
+
+
+2. Xếp hạng ưu tiên theo weight từ cao xuống thấp
+Chương 1 -&gt; chương 3 -&gt; chương 2
+
+
+3.Quyết định số các section xuất hiện trong lần làm tiếp theo
+Mentor config : 12 section gồm Chương 1 : 4 section – Weight sai : 0.54
+                      Chương 2 : 4 section – Weight sai : 0.47
+       Chương 3 : 4 section – Weight sai : 0.53
+=&gt; Tổng Weight sai = 0.54 + 0.47 + 0.53 = 1.54
+=&gt; Lượng section mỗi chương xuất hiện trong bài kiểm tra tiếp theo:  (làm tròn xuống)
+Chương 1 : 0.54 / 1.54 * 12 = ~ 4.21 = 4 Section
+Chương 2 : 0.47 / 1.54 * 12 = ~  3.67 = 3 Section
+Chương 3 : 0.53 / 1.54 * 12 = ~ 4.13 = 4 Section
+Tổng section hiện tại = 11 &lt; Tổng sectoin Mentor’s config = 12
+Lượng còn thiếu sẽ bù vào chương có Weight cao nhất 
+=&gt;Lượng section mỗi chương sau khi tính toán:
+Chương 1 : 5 Section
+Chương 2 : 3 Section
+Chương 3 : 4 Section
+=&gt;Đối chiếu với question bank : Nếu lượng section hiện tại của chương &gt; lượng section trong Question bank =&gt; Lấy toàn bộ  Section của chương đó 
+Phần section còn thiếu sẽ bù vào Chương khác dựa theo Weight từ cao xuống thấp
+
+
+
+4.Random Câu hỏi theo section
+Random đều theo lượng câu hỏi của mentor’s config
+Hiện tại mentor’s config : chương 1 : 13 câu
+                                                     Chương 2: 17 câu
+         Chương 3: 19 câu
+Lượng section sau khi tính toán :
+                                                       Chương 1 : 5 Section
+                                                       Chương 2 : 3 Section
+                                                       Chương 3 : 4 Section
+=&gt;chia đều số câu hỏi cho các section :
+Chương 1: 5 section -&gt; mỗi section lấy 2 câu -&gt; còn thiếu 3 câu -&gt; lấy 3 câu ở section có nhiều câu hỏi nhất  
+Chương 2: 3 section -&gt; mỗi section lấy 5 câu -&gt; còn thiếu 2 câu -&gt; lấy 3 câu ở section có nhiều câu hỏi nhất  
+Chương 3: 4 section -&gt; mỗi section lấy 4 câu -&gt; còn thiếu 3 câu -&gt; lấy 3 câu ở section có nhiều câu hỏi nhất
+Ở đây lượng câu hỏi trong 1 section và tổng câu hỏi cho kỹ năng Từ Vựng Ngữ Pháp là do mentor config với ràng buộc số câu hỏi của kỹ năng này không được vượt quá tổng câu hỏi Trong Question Bank
+
+
+
+

@@ -137,6 +137,23 @@ const getLatestSubmittedAttemptId = async (userId, testId) => {
     return result.recordset[0]?.AttemptId ?? null;
 };
 
+/** Lần làm gần nhất (submitted hoặc in_progress), không lọc theo Status */
+const getLatestAttemptByUserAndTest = async (userId, testId) => {
+    const request = new sql.Request();
+    request.input('userId', sql.Int, Number(userId));
+    request.input('testId', sql.Int, Number(testId));
+
+    const result = await request.query(`
+        SELECT TOP 1 AttemptId, StartedAt, SubmittedAt, Status
+        FROM dbo.Test_Attempts
+        WHERE UserId = @userId
+          AND TestId = @testId
+        ORDER BY AttemptId DESC
+    `);
+
+    return result.recordset[0] ?? null;
+};
+
 const getSectionStatsByUserAndTest = async (userId, testId) => {
     const request = new sql.Request();
     request.input('userId', sql.Int, Number(userId));
@@ -165,7 +182,6 @@ const getSectionStatsByUserAndTest = async (userId, testId) => {
         LEFT JOIN dbo.Paths p ON p.PathId = s.PathId
         WHERE ta.UserId = @userId
           AND ta.TestId = @testId
-          AND ta.Status = 'submitted'
     `);
 
     return result.recordset ?? [];
@@ -303,6 +319,7 @@ module.exports = {
     getAttemptCountByUserAndTest,
     getSubmittedAttemptCountByUserAndTest,
     getLatestSubmittedAttemptId,
+    getLatestAttemptByUserAndTest,
     getSectionStatsByUserAndTest,
     getTestAttemptsHistory,
     saveTestAttemptAnswers,

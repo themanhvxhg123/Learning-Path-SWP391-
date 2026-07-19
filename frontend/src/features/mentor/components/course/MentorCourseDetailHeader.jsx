@@ -5,6 +5,7 @@ import {
   Link as MuiLink,
   Tab,
   Tabs,
+  Tooltip,
   Typography,
   useTheme,
 } from '@mui/material';
@@ -60,12 +61,14 @@ export default function MentorCourseDetailHeader({
   onTabChange,
   onPublishToggle,
   publishing = false,
+  publishBlockReason = null,
 }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const published = isCoursePublished(course);
   const statusChip = getStatusChip(published);
   const questionBankPath = buildQuestionBankCoursePath(course.CourseId ?? course.courseId);
+  const publishBlocked = !published && Boolean(publishBlockReason);
 
   // console.log(course)
   return (
@@ -190,32 +193,45 @@ export default function MentorCourseDetailHeader({
             ---------------Button set publish course--------------------
             */}
 
-            <AppButton
-              startIcon={
-                published ? (
-                  <UnpublishedRoundedIcon sx={{ fontSize: 16 }} />
-                ) : (
-                  <PublishRoundedIcon sx={{ fontSize: 16 }} />
-                )
-              }
-              onClick={onPublishToggle}
-              disabled={publishing}
-              sx={{
-                height: 38,
-                borderRadius: '999px',
-                fontSize: 13,
-                fontWeight: 700,
-                px: 2,
-                bgcolor: PRIMARY,
-                color: '#fff',
-                flex: { xs: '1 1 0', sm: '0 0 auto' },
-                minWidth: { xs: 0, sm: 'auto' },
-                boxShadow: 'none',
-                '&:hover': { bgcolor: '#0E7490', boxShadow: 'none' },
-              }}
-            >
-              {published ? 'Hủy xuất bản' : 'Xuất bản'}
-            </AppButton>
+            {(() => {
+              const publishButton = (
+                <AppButton
+                  startIcon={
+                    published ? (
+                      <UnpublishedRoundedIcon sx={{ fontSize: 16 }} />
+                    ) : (
+                      <PublishRoundedIcon sx={{ fontSize: 16 }} />
+                    )
+                  }
+                  onClick={onPublishToggle}
+                  disabled={publishing || publishBlocked}
+                  sx={{
+                    height: 38,
+                    borderRadius: '999px',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    px: 2,
+                    bgcolor: PRIMARY,
+                    color: '#fff',
+                    flex: { xs: '1 1 0', sm: '0 0 auto' },
+                    minWidth: { xs: 0, sm: 'auto' },
+                    boxShadow: 'none',
+                    opacity: publishBlocked ? 0.72 : 1,
+                    '&:hover': { bgcolor: '#0E7490', boxShadow: 'none' },
+                  }}
+                >
+                  {published ? 'Hủy xuất bản' : 'Xuất bản'}
+                </AppButton>
+              );
+
+              if (!publishBlocked) return publishButton;
+
+              return (
+                <Tooltip title={publishBlockReason} arrow placement="top">
+                  <span>{publishButton}</span>
+                </Tooltip>
+              );
+            })()}
           </Box>
         </Box>
       </Box>

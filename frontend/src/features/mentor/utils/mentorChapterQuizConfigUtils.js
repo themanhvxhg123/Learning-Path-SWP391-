@@ -104,6 +104,15 @@ export function aggregateSkillSectionGroupsFromChapters(
   return groups;
 }
 
+export function buildChapterQuizPathIdSet(configs = []) {
+  return new Set(
+    (configs ?? [])
+      .map((config) => config?.chapterId ?? config?.pathId)
+      .filter((id) => id != null && id !== '')
+      .map(String),
+  );
+}
+
 export function isFirstChapterQuiz(chapterIndex = 0) {
   return Math.max(0, Number(chapterIndex) || 0) === 0;
 }

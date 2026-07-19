@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:recommendation": "node test/testRecommendationService.docx.test.js",
     "start": "node --disable-warning=DEP0040 server.js",
     "db:material-columns": "node scripts/add-material-cloudinary-columns.js",
     "db:material-type": "node scripts/update-material-type-constraint.js",

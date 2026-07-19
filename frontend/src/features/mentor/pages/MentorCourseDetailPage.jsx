@@ -55,6 +55,7 @@ import {
   MENTOR_COURSE_DETAIL_TABS,
   parseMentorCourseDetailTab,
 } from '@/features/mentor/utils/mentorCourseDetailUtils';
+import { getCoursePublishBlockReason } from '@/features/mentor/utils/mentorCourseUtils';
 
 export default function MentorCourseDetailPage() {
   const navigate = useNavigate();
@@ -119,8 +120,18 @@ export default function MentorCourseDetailPage() {
     }
   };
 
+  const publishBlockReason = course && !course.IsPublished
+    ? getCoursePublishBlockReason(course)
+    : null;
+
   const handlePublishToggle = () => {
     if (!course || publishing) return;
+
+    if (course.IsPublished !== true && publishBlockReason) {
+      toast.error(publishBlockReason);
+      return;
+    }
+
     setPublishDialog(course.IsPublished === true ? 'unpublish' : 'publish');
   };
 
@@ -201,6 +212,7 @@ export default function MentorCourseDetailPage() {
         onTabChange={handleTabChange}
         onPublishToggle={handlePublishToggle}
         publishing={publishing}
+        publishBlockReason={publishBlockReason}
       />
 
       {/* 

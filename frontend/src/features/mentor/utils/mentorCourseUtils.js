@@ -1,7 +1,11 @@
 /**
  * Normalize raw course records from API (PascalCase) or mock (camelCase).
  */
-import { countMaterialsInPath } from './mentorCourseContentUtils';
+import {
+  countMaterialsInPath,
+  getCoursePaths,
+  isPathActive,
+} from './mentorCourseContentUtils';
 
 function pickNonEmpty(...values) {
   for (const value of values) {
@@ -136,6 +140,26 @@ export function formatCourseRating(course = {}) {
 
 export function isCoursePublished(course = {}) {
   return courseIsPublished(course);
+}
+
+/** Đếm chương đã xuất bản (IsActive = 1). */
+export function countPublishedChapters(course = {}) {
+  const paths = getCoursePaths(course);
+  if (paths.length > 0) {
+    return paths.filter(isPathActive).length;
+  }
+
+  const totalPaths = Number(course.TotalPaths ?? course.totalPaths ?? 0);
+  return Number.isFinite(totalPaths) && totalPaths > 0 ? totalPaths : 0;
+}
+
+export function courseCanPublish(course = {}) {
+  return countPublishedChapters(course) > 0;
+}
+
+export function getCoursePublishBlockReason(course = {}) {
+  if (courseCanPublish(course)) return null;
+  return 'Khóa học cần ít nhất 1 chương được xuất bản trước khi xuất bản.';
 }
 
 function getCourseTimestamp(course, kind = 'updated') {

@@ -109,6 +109,37 @@ export function getChapterPublishBlockReason(path = {}) {
   return null;
 }
 
+/** Chương đã có bài kiểm tra cuối chương (theo PathId). */
+export function pathHasChapterQuizTest(pathId, chapterQuizPathIds = null) {
+  if (pathId == null || pathId === '') return false;
+  const ids = chapterQuizPathIds instanceof Set
+    ? chapterQuizPathIds
+    : new Set((chapterQuizPathIds ?? []).map(String));
+  return ids.has(String(pathId));
+}
+
+/** Lý do không cho ẩn/hủy xuất bản chương đang hiển thị. */
+export function getChapterUnpublishBlockReason(path = {}, { chapterQuizPathIds = null } = {}) {
+  if (!isPathActive(path)) return null;
+  const pathId = path.PathId ?? path.pathId;
+  if (!pathHasChapterQuizTest(pathId, chapterQuizPathIds)) return null;
+  return 'Không thể ẩn chương đã có bài kiểm tra.';
+}
+
+/** Lý do không cho ẩn bài học khi chương có bài kiểm tra và đây là bài học xuất bản cuối cùng. */
+export function getLessonUnpublishBlockReason(node = {}, path = {}, { chapterQuizPathIds = null } = {}) {
+  if (!isNodeActive(node)) return null;
+  const pathId = path.PathId ?? path.pathId;
+  if (!pathHasChapterQuizTest(pathId, chapterQuizPathIds)) return null;
+
+  const otherActiveNodes = getPathNodes(path).filter(
+    (item) => item.tempId !== node.tempId && isNodeActive(item),
+  ).length;
+
+  if (otherActiveNodes >= 1) return null;
+  return 'Chương có bài kiểm tra cần ít nhất 1 bài học được xuất bản.';
+}
+
 /** Hủy xuất bản chương khi không còn bài học nào được xuất bản. */
 export function normalizeChapterPublishState(path = {}) {
   if (!isPathActive(path)) return path;
@@ -686,6 +717,40 @@ export function hasUnsavedEditScopeDirty(dirtyKeys, focusTarget, activePathTempI
   return false;
 }
 
+/** Focus đang trỏ tới chương/bài/học liệu mới tạo nhưng chưa lưu DB. */
+export function hasPendingNewUnsavedFocus(focusTarget, paths = []) {
+  if (!focusTarget?.pathTempId) return false;
+
+  const path = (paths ?? []).find((item) => item.tempId === focusTarget.pathTempId);
+  if (!path) return false;
+
+  if (
+    focusTarget.type === 'material'
+    && focusTarget.nodeTempId
+    && focusTarget.materialTempId
+  ) {
+    const node = (path.nodes ?? path.Nodes ?? []).find(
+      (item) => item.tempId === focusTarget.nodeTempId,
+    );
+    const material = filterLearningMaterials(node?.materials ?? node?.Materials ?? [])
+      .find((item) => item.tempId === focusTarget.materialTempId);
+    return isNewUnsavedMaterial(material);
+  }
+
+  if (focusTarget.type === 'lesson' && focusTarget.nodeTempId) {
+    const node = (path.nodes ?? path.Nodes ?? []).find(
+      (item) => item.tempId === focusTarget.nodeTempId,
+    );
+    return isNewUnsavedNode(node);
+  }
+
+  if (focusTarget.type === 'chapter-edit') {
+    return isNewUnsavedPath(path);
+  }
+
+  return false;
+}
+
 export function pathHasAnyDirty(dirtyKeys = {}, pathTempId) {
   if (!pathTempId) return false;
   return Object.keys(dirtyKeys).some((key) => (
@@ -746,7 +811,7 @@ function applyDuplicateNameErrors(groups, assignError) {
   });
 }
 
-export function validatePathFieldsForSave(path, allPaths = []) {
+export function validatePathFieldsForSave(path, allPaths = [], options = {}) {
   const errors = {};
 
   if (!String(path.PathName ?? '').trim()) {
@@ -762,6 +827,10 @@ export function validatePathFieldsForSave(path, allPaths = []) {
     errors.PathName = 'Tên chương bị trùng.';
   }
 
+  if (!isPathActive(path) && pathHasChapterQuizTest(path.PathId ?? path.pathId, options.chapterQuizPathIds)) {
+    errors._publish = 'Không thể ẩn chương đã có bài kiểm tra.';
+  }
+
   if (isPathActive(path) && !chapterCanPublish(path)) {
     errors._publish = getChapterPublishBlockReason(path);
   }
@@ -769,7 +838,7 @@ export function validatePathFieldsForSave(path, allPaths = []) {
   return errors;
 }
 
-export function validateNodeFieldsForSave(node, siblingNodes = []) {
+export function validateNodeFieldsForSave(node, siblingNodes = [], options = {}) {
   const errors = {};
 
   if (!String(node.NodeName ?? node.nodeName ?? '').trim()) {
@@ -784,6 +853,21 @@ export function validateNodeFieldsForSave(node, siblingNodes = []) {
   );
   if (hasDuplicate) {
     errors.NodeName = 'Tên bài học bị trùng.';
+  }
+
+  const path = options.path ?? null;
+  if (
+    path
+    && !isNodeActive(node)
+    && pathHasChapterQuizTest(path.PathId ?? path.pathId, options.chapterQuizPathIds)
+  ) {
+    const siblings = siblingNodes.length > 0 ? siblingNodes : getPathNodes(path);
+    const otherActiveNodes = siblings.filter(
+      (item) => item.tempId !== node.tempId && isNodeActive(item),
+    ).length;
+    if (otherActiveNodes < 1) {
+      errors._publish = 'Chương có bài kiểm tra cần ít nhất 1 bài học được xuất bản.';
+    }
   }
 
   if (isNodeActive(node) && !lessonCanPublish(node)) {

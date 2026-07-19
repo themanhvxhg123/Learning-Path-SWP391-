@@ -9,12 +9,10 @@ import MentorCourseStudentsToolbar from './MentorCourseStudentsToolbar';
 import MentorCourseStudentsList from './MentorCourseStudentsList';
 import MentorCourseStudentsPagination from './MentorCourseStudentsPagination';
 
-import {
-  fetchCourseStudents,
-  fetchCourseStudentStats,
-} from '@/features/mentor/services/mentorCourseService';
+import { fetchCourseStudents } from '@/features/mentor/services/mentorCourseService';
 
 import {
+  computeCourseStudentStats,
   filterAndSortCourseStudents,
   hasActiveCourseStudentFilters,
   paginateCourseStudents,
@@ -72,19 +70,14 @@ export default function MentorCourseStudentsTab({ courseId }) {
     // 2. fetchCourseStudentStats(courseId): lấy thống kê học viên
     //
     // Promise.all giúp 2 API chạy cùng lúc, nhanh hơn gọi tuần tự
-    const [studentsRes, statsRes] = await Promise.all([
-      fetchCourseStudents(courseId),
-      fetchCourseStudentStats(courseId),
-    ]);
+    const studentsRes = await fetchCourseStudents(courseId);
 
-    // Nếu API học viên thành công thì lưu danh sách vào allStudents
     if (studentsRes.ok) {
       setAllStudents(studentsRes.students);
-    }
-
-    // Nếu API thống kê thành công thì lưu thống kê vào stats
-    if (statsRes.ok) {
-      setStats(statsRes.stats);
+      setStats(computeCourseStudentStats(studentsRes.students));
+    } else {
+      setAllStudents([]);
+      setStats(computeCourseStudentStats([]));
     }
 
     // Tải xong thì tắt loading

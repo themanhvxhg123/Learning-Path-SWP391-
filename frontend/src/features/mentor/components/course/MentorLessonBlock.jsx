@@ -280,15 +280,17 @@ export default function MentorLessonBlock({
           {materialCount} học liệu
         </Typography>
 
-        <IconButton
-          size="small"
-          onClick={onDelete}
-          disabled={disabled}
-          aria-label="Xóa bài học"
-          sx={DELETE_ICON_BTN_SX}
-        >
-          <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-        </IconButton>
+        {onDelete ? (
+          <IconButton
+            size="small"
+            onClick={onDelete}
+            disabled={disabled}
+            aria-label="Xóa bài học"
+            sx={DELETE_ICON_BTN_SX}
+          >
+            <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        ) : null}
       </Box>
 
       <Collapse in={expanded}>{lessonForm}</Collapse>

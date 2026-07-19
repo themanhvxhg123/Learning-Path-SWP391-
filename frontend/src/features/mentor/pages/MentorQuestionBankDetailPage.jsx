@@ -42,15 +42,19 @@ import {
   getMockChaptersForCourse,
   getMockCourseFromQuestionBank,
 } from '@/features/mentor/data/mentorQuestionBankMock';
+import { getCourseQuestionBankActiveStats } from '@/features/mentor/services/questionBankService';
 import axios from 'axios';
 
 //________Component con: thẻ hiển thị một chương trong danh sách__________
 // Trigger click → gọi onOpen(path) để parent navigate sang trang workspace
-function PathChapterCard({ path, index, onOpen }) {
+function PathChapterCard({ path, index, onOpen, stats, statsLoaded = false }) {
   const theme = useTheme();
-  const label = path.displayLabel || path.PathName || `Chương #${path.PathId}`;
-  const chapterNumber = path.Order ?? index + 1;
-  const questionCount = Number(path.QuestionCount) || 0;
+  const listeningSectionCount = stats?.listeningSectionGroups?.length ?? 0;
+  const readingSectionCount = stats?.readingSectionGroups?.length ?? 0;
+  const vocabularyQuestionCount = stats?.questionCountBySkill?.VOCABULARY ?? 0;
+  const hasQuestionBankContent =
+    listeningSectionCount > 0 || readingSectionCount > 0 || vocabularyQuestionCount > 0;
+  const showMissingBankBadge = statsLoaded && !hasQuestionBankContent;
 
   return (
     <Box
@@ -97,22 +101,60 @@ function PathChapterCard({ path, index, onOpen }) {
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
+        <Box
           sx={{
-            fontSize: 16,
-            fontWeight: 700,
-            color: TEXT,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
             mb: 0.35,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            flexWrap: 'wrap',
           }}
         >
-          {path.PathName}
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-          <QuizOutlinedIcon sx={{ fontSize: 15, color: MUTED }} />
-          <Typography sx={{ fontSize: 13, color: MUTED }}>{questionCount} câu hỏi</Typography>
+          <Typography
+            sx={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: TEXT,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+              flex: '1 1 auto',
+            }}
+          >
+            {path.PathName}
+          </Typography>
+          {showMissingBankBadge ? (
+            <Box
+              component="span"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                px: 1,
+                py: 0.25,
+                borderRadius: '999px',
+                bgcolor: alpha('#DC2626', 0.1),
+                border: `1px solid ${alpha('#DC2626', 0.22)}`,
+                color: '#DC2626',
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1.4,
+                flexShrink: 0,
+              }}
+            >
+              Chưa có question bank
+            </Box>
+          ) : null}
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75 }}>
+          <QuizOutlinedIcon sx={{ fontSize: 15, color: MUTED, mt: 0.15 }} />
+          <Typography sx={{ fontSize: 13, color: MUTED, lineHeight: 1.45 }}>
+            Nghe: {listeningSectionCount} section
+            {' · '}
+            Đọc: {readingSectionCount} section
+            {' · '}
+            Từ vựng/Ngữ pháp: {vocabularyQuestionCount} câu
+          </Typography>
         </Box>
       </Box>
 
@@ -130,31 +172,39 @@ export default function MentorQuestionBankDetailPage() {
   // course: thông tin khóa học từ API
   const [course, setCourse] = useState();
   // coursePaths: danh sách chương (paths) của khóa học
-  const [coursePaths, setCoursePaths] = useState([])
+  const [coursePaths, setCoursePaths] = useState([]);
+  const [chapterStatsByPathId, setChapterStatsByPathId] = useState({});
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   // ===== useEffect: TẢI KHÓA HỌC + DANH SÁCH CHƯƠNG =====
   useEffect(() => {
     const fetchData = async () => {
+      setStatsLoaded(false);
       try {
+        const [resCourse, resCoursePaths, statsRes] = await Promise.all([
+          axios.get(`http://localhost:5000/api/courses/my-courses/${courseId}?tab=course`),
+          axios.get(`http://localhost:5000/api/courses/my-courses/${courseId}/chapters`),
+          getCourseQuestionBankActiveStats(courseId),
+        ]);
 
-        const [resCourse, resCoursePaths] = await Promise.all(
-          [
-            axios.get(`http://localhost:5000/api/courses/my-courses/${courseId}?tab=course`),
-            // axios.get(`http://localhost:5000/api/question-bank/getBankPaths/${questionBankId}`),
-            axios.get(`http://localhost:5000/api/courses/my-courses/${courseId}/chapters`)
-          ]
-        )
+        setCourse(resCourse.data.data[0]);
+        setCoursePaths(resCoursePaths.data.data.Paths ?? []);
 
-        setCourse(resCourse.data.data[0])
-        // setQuestionBankPaths(resQuestionBankPaths.data.data)
-        setCoursePaths(resCoursePaths.data.data.Paths)
+        const nextStatsByPathId = {};
+        if (statsRes.ok) {
+          (statsRes.chapters ?? []).forEach((chapter) => {
+            nextStatsByPathId[String(chapter.PathId)] = chapter;
+          });
+        }
+        setChapterStatsByPathId(nextStatsByPathId);
       } catch (error) {
-        console.error(error.message)
+        console.error(error.message);
+      } finally {
+        setStatsLoaded(true);
       }
-    }
+    };
     fetchData();
-
-  }, [courseId])
+  }, [courseId]);
 
   const chapterId = searchParams.get('chapterId') ?? '';
   // const isEditorMode = searchParams.get('mode') === 'editor';
@@ -348,6 +398,8 @@ export default function MentorQuestionBankDetailPage() {
             path={path}
             index={index}
             onOpen={openPath}
+            stats={chapterStatsByPathId[String(path.PathId)]}
+            statsLoaded={statsLoaded}
           />
         ))}
       </Box>

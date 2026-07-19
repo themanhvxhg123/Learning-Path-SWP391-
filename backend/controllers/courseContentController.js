@@ -1,5 +1,6 @@
 const coursesModel = require('../Models/coursesModel');
 const courseContentSaveModel = require('../Models/courseContentSaveModel');
+const chapterQuizConfigModel = require('../Models/chapterQuizConfigModel');
 const {
   fetchCloudinaryAssetBuffer,
   isCloudinaryDeliveryUrl,
@@ -122,6 +123,15 @@ const updatePathById = async (req, res) => {
     if (set.IsActive !== undefined && toPathIsActiveBit(set.IsActive, 1) === 1) {
       await courseContentSaveModel.assertPathCanPublish(pathId);
     }
+    if (set.IsActive !== undefined && toPathIsActiveBit(set.IsActive, 1) === 0) {
+      const existingTest = await chapterQuizConfigModel.getChapterTestByPathId(pathId);
+      if (existingTest) {
+        return res.status(400).json({
+          success: false,
+          message: 'Không thể ẩn chương đã có bài kiểm tra.',
+        });
+      }
+    }
     await courseContentSaveModel.updatePathById(pathId, set);
 
     return res.status(200).json({
@@ -210,6 +220,21 @@ const updateNodeById = async (req, res) => {
     }
     if (set.IsActive !== undefined && toPathIsActiveBit(set.IsActive, 1) === 1) {
       await courseContentSaveModel.assertNodeCanPublish(nodeId);
+    }
+    if (set.IsActive !== undefined && toPathIsActiveBit(set.IsActive, 1) === 0 && access.pathId) {
+      const existingTest = await chapterQuizConfigModel.getChapterTestByPathId(access.pathId);
+      if (existingTest) {
+        const activeNodeCount = await courseContentSaveModel.countActiveNodesInPath(
+          access.pathId,
+          { excludeNodeId: nodeId },
+        );
+        if (activeNodeCount < 1) {
+          return res.status(400).json({
+            success: false,
+            message: 'Chương có bài kiểm tra cần ít nhất 1 bài học được xuất bản.',
+          });
+        }
+      }
     }
     await courseContentSaveModel.updateNodeById(nodeId, set);
 

@@ -78,6 +78,7 @@ const setPublishCourse = async (req, res) => {
             });
         }
 
+        await coursesModel.assertCourseCanPublish(courseId);
         const courseIdSetPublish = await coursesModel.setPublishCourse(courseId);
 
         return res.status(200).json({
@@ -88,9 +89,9 @@ const setPublishCourse = async (req, res) => {
     } catch (error) {
         console.error('setPublishCourse error:', error);
 
-        return res.status(500).json({
+        return res.status(error.statusCode === 400 ? 400 : 500).json({
             success: false,
-            message: 'Lỗi server setPublishCourse',
+            message: error.message ?? 'Lỗi server setPublishCourse',
         });
     }
 };

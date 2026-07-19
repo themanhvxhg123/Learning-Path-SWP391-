@@ -16,7 +16,7 @@ import {
   scopedUpdateButtonSx,
 } from './mentorCourseContentStyles';
 import { PathPublishToggle, NodePublishToggle } from './MentorPublishToggles';
-import { filterLearningMaterials, getMaterialPersistentId, isEditDirty, isMaterialFileUploadPending, makePathDirtyKey, makeNodeDirtyKey, makeMaterialDirtyKey, resolveChapterId, chapterHasContent, chapterCanPublish, getChapterPublishBlockReason, lessonCanPublish, getLessonPublishBlockReason, isPathActive, isNodeActive } from '@/features/mentor/utils/mentorCourseContentUtils';
+import { filterLearningMaterials, getMaterialPersistentId, isEditDirty, isMaterialFileUploadPending, makePathDirtyKey, makeNodeDirtyKey, makeMaterialDirtyKey, resolveChapterId, chapterHasContent, chapterCanPublish, getChapterPublishBlockReason, getChapterUnpublishBlockReason, lessonCanPublish, getLessonPublishBlockReason, getLessonUnpublishBlockReason, isPathActive, isNodeActive } from '@/features/mentor/utils/mentorCourseContentUtils';
 
 export default function MentorCourseContentBuilder({
   paths,
@@ -36,6 +36,8 @@ export default function MentorCourseContentBuilder({
   onMaterialDelete,
   onMaterialReorder,
   disabled = false,
+  allowNodeDelete = true,
+  allowMaterialDelete = true,
   dirtyKeys = {},
   savingChapterId = null,
   onSaveChapter,
@@ -59,6 +61,7 @@ export default function MentorCourseContentBuilder({
   courseTitle = '',
   focusTarget = null,
   sidebarLayout = false,
+  chapterQuizPathIds = null,
 }) {
   const [internalActiveChapterId, setInternalActiveChapterId] = useState(() => paths[0]?.tempId ?? null);
   const isControlledChapter = controlledActiveChapterId !== undefined;
@@ -142,6 +145,9 @@ export default function MentorCourseContentBuilder({
   const activePathPublishBlockReason = activePath && !chapterCanPublish(activePath)
     ? getChapterPublishBlockReason(activePath)
     : null;
+  const activePathHideBlockReason = activePath
+    ? getChapterUnpublishBlockReason(activePath, { chapterQuizPathIds })
+    : null;
   const activePathDirty = Boolean(
     activePath && isEditDirty(dirtyKeys, makePathDirtyKey(activePath.tempId)),
   );
@@ -203,6 +209,9 @@ export default function MentorCourseContentBuilder({
   const activeNodePublishBlockReason = activeNode && !isNodeActive(activeNode) && !lessonCanPublish(activeNode)
     ? getLessonPublishBlockReason(activeNode)
     : null;
+  const activeNodeHideBlockReason = activePath && activeNode
+    ? getLessonUnpublishBlockReason(activeNode, activePath, { chapterQuizPathIds })
+    : null;
 
   useEffect(() => {
     if (activePathIndex >= 0) activeChapterIndexRef.current = activePathIndex;
@@ -214,14 +223,8 @@ export default function MentorCourseContentBuilder({
   };
 
   const handleDeleteNewPath = useCallback((pathTempId) => {
-    if (pathTempId === activeChapterId) {
-      const idx = paths.findIndex((p) => p.tempId === pathTempId);
-      const remaining = paths.filter((p) => p.tempId !== pathTempId);
-      const nextIdx = Math.max(0, idx - 1);
-      setActiveChapterId(remaining[nextIdx]?.tempId ?? null);
-    }
     onDeleteNewPath?.(pathTempId);
-  }, [activeChapterId, paths, onDeleteNewPath, setActiveChapterId]);
+  }, [onDeleteNewPath]);
 
   return (
     <>
@@ -308,10 +311,16 @@ export default function MentorCourseContentBuilder({
                         onChange={onPathChange}
                         disabled={disabled}
                         publishBlockReason={activePathPublishBlockReason}
+                        hideBlockReason={activePathHideBlockReason}
                       />
                       {activePathPublishBlockReason ? (
                         <Typography sx={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
                           {activePathPublishBlockReason}
+                        </Typography>
+                      ) : null}
+                      {activePathHideBlockReason ? (
+                        <Typography sx={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
+                          {activePathHideBlockReason}
                         </Typography>
                       ) : null}
                       {activePathDirty ? (
@@ -352,10 +361,16 @@ export default function MentorCourseContentBuilder({
                         }
                         disabled={disabled}
                         publishBlockReason={activeNodePublishBlockReason}
+                        hideBlockReason={activeNodeHideBlockReason}
                       />
                       {activeNodePublishBlockReason ? (
                         <Typography sx={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
                           {activeNodePublishBlockReason}
+                        </Typography>
+                      ) : null}
+                      {activeNodeHideBlockReason ? (
+                        <Typography sx={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
+                          {activeNodeHideBlockReason}
                         </Typography>
                       ) : null}
                       {activeNodeNeedsPathFirst ? (
@@ -504,6 +519,8 @@ export default function MentorCourseContentBuilder({
                   onMaterialDelete={onMaterialDelete}
                   onMaterialReorder={onMaterialReorder}
                   disabled={disabled}
+                  allowNodeDelete={allowNodeDelete}
+                  allowMaterialDelete={allowMaterialDelete}
                   isSaved={!isEditDirty(dirtyKeys, makePathDirtyKey(activePath.tempId))}
                   saving={savingChapterId === activePath.tempId}
                   showSave={showChapterSave}
@@ -531,6 +548,7 @@ export default function MentorCourseContentBuilder({
                   showNodeContent={showNodeContent}
                   showMaterialContent={showMaterialContent}
                   onRequestContentNavigation={onRequestContentNavigation}
+                  chapterQuizPathIds={chapterQuizPathIds}
                 />
                 ) : (
                   <Box

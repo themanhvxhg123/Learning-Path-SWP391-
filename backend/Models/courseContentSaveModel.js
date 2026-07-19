@@ -171,6 +171,23 @@ async function assertNodeCanPublish(nodeId, transaction = null) {
   }
 }
 
+async function countActiveNodesInPath(pathId, { excludeNodeId = null } = {}, transaction = null) {
+  const request = transaction ? new sql.Request(transaction) : new sql.Request();
+  request.input('pathId', sql.Int, Number(pathId));
+  const excludeClause = excludeNodeId != null ? 'AND NodeId <> @excludeNodeId' : '';
+  if (excludeNodeId != null) {
+    request.input('excludeNodeId', sql.Int, Number(excludeNodeId));
+  }
+  const result = await request.query(`
+    SELECT COUNT(*) AS ActiveNodeCount
+    FROM dbo.Path_Nodes
+    WHERE PathId = @pathId
+      AND ISNULL(IsActive, 1) = 1
+      ${excludeClause}
+  `);
+  return Number(result.recordset[0]?.ActiveNodeCount ?? 0);
+}
+
 async function unpublishPathIfNoActiveNodes(pathId, transaction = null) {
   const request = transaction ? new sql.Request(transaction) : new sql.Request();
   request.input('pathId', sql.Int, Number(pathId));
@@ -387,6 +404,7 @@ module.exports = {
   updatePathById,
   assertPathCanPublish,
   assertNodeCanPublish,
+  countActiveNodesInPath,
   unpublishPathIfNoActiveNodes,
   deletePathById,
   insertNodeRow,

@@ -35,6 +35,8 @@ export function getStudentProgressColor(percentage = 0) {
   return STUDENT_PROGRESS_COLORS.not_started;
 }
 
+import { resolveAvatarUrl } from '@/features/profile/utils/profileAvatarUtils';
+
 export function normalizeCourseStudent(raw = {}) {
   const progressPercentage = Number(
     raw.progressPercentage ?? raw.ProgressPercentage ?? 0
@@ -52,7 +54,7 @@ export function normalizeCourseStudent(raw = {}) {
     userId: raw.userId ?? raw.UserId,
     fullName: raw.fullName ?? raw.FullName ?? '',
     email: raw.email ?? raw.Email ?? '',
-    avatarUrl: raw.avatarUrl ?? raw.AvatarUrl ?? null,
+    avatarUrl: resolveAvatarUrl(raw.avatarUrl ?? raw.AvatarUrl ?? null),
     enrollmentDate: raw.enrollmentDate ?? raw.EnrollmentDate ?? null,
 
     status,
@@ -127,7 +129,7 @@ export function filterAndSortCourseStudents(students = [], query = {}) {
     if (status !== 'all' && student.status !== status) return false;
 
     if (keyword) {
-      const haystack = [student.FullName, student.Email].filter(Boolean).join(' ').toLowerCase();
+      const haystack = [student.fullName, student.email].filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(keyword)) return false;
     }
 

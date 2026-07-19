@@ -10,10 +10,12 @@ export function PathPublishToggle({
   onChange,
   disabled = false,
   publishBlockReason = null,
+  hideBlockReason = null,
 }) {
   const published = isPathActive(path);
   const publishBlocked = !published && Boolean(publishBlockReason);
-  const switchDisabled = disabled || publishBlocked;
+  const hideBlocked = published && Boolean(hideBlockReason);
+  const switchDisabled = disabled || publishBlocked || hideBlocked;
 
   const toggle = (
     <Box
@@ -36,7 +38,10 @@ export function PathPublishToggle({
       <Switch
         size="small"
         checked={published}
-        onChange={(event) => onChange(path.tempId, { IsActive: event.target.checked ? 1 : 0 })}
+        onChange={(event) => {
+          if (published && !event.target.checked && hideBlockReason) return;
+          onChange(path.tempId, { IsActive: event.target.checked ? 1 : 0 });
+        }}
         disabled={switchDisabled}
         inputProps={{ 'aria-label': 'Xuất bản chương cho học viên' }}
         sx={{
@@ -48,9 +53,10 @@ export function PathPublishToggle({
     </Box>
   );
 
-  if (publishBlocked) {
+  const blockReason = publishBlocked ? publishBlockReason : (hideBlocked ? hideBlockReason : null);
+  if (blockReason) {
     return (
-      <Tooltip title={publishBlockReason} arrow placement="top">
+      <Tooltip title={blockReason} arrow placement="top">
         <span>{toggle}</span>
       </Tooltip>
     );
@@ -64,10 +70,12 @@ export function NodePublishToggle({
   onChange,
   disabled = false,
   publishBlockReason = null,
+  hideBlockReason = null,
 }) {
   const published = isNodeActive(node);
   const publishBlocked = !published && Boolean(publishBlockReason);
-  const switchDisabled = disabled || publishBlocked;
+  const hideBlocked = published && Boolean(hideBlockReason);
+  const switchDisabled = disabled || publishBlocked || hideBlocked;
 
   const toggle = (
     <Box
@@ -90,7 +98,10 @@ export function NodePublishToggle({
       <Switch
         size="small"
         checked={published}
-        onChange={(event) => onChange(node.tempId, { IsActive: event.target.checked ? 1 : 0 })}
+        onChange={(event) => {
+          if (published && !event.target.checked && hideBlockReason) return;
+          onChange(node.tempId, { IsActive: event.target.checked ? 1 : 0 });
+        }}
         disabled={switchDisabled}
         inputProps={{ 'aria-label': 'Xuất bản bài học cho học viên' }}
         sx={{
@@ -102,9 +113,10 @@ export function NodePublishToggle({
     </Box>
   );
 
-  if (publishBlocked) {
+  const blockReason = publishBlocked ? publishBlockReason : (hideBlocked ? hideBlockReason : null);
+  if (blockReason) {
     return (
-      <Tooltip title={publishBlockReason} arrow placement="top">
+      <Tooltip title={blockReason} arrow placement="top">
         <span>{toggle}</span>
       </Tooltip>
     );

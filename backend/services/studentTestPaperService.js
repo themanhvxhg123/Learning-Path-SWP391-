@@ -64,7 +64,7 @@ function assertConfigHasQuizSources(config, scopeLabel = 'bài kiểm tra') {
 
 async function buildPaperFromConfig(config, sectionsData, options = {}) {
   return randomizeTestPaperFromConfig(config, sectionsData, {
-    chapterWeights: options.chapterWeights ?? {},
+    chapterSectionCounts: options.chapterSectionCounts ?? {},
     loadQuestionsForSection: (sectionId) => questionBankModel.getQuestionsBySection(sectionId),
   });
 }
@@ -74,9 +74,17 @@ async function buildChapterTestPaper(config, sectionsData) {
   return buildPaperFromConfig(config, sectionsData);
 }
 
-async function buildCourseTestPaper(config, courseId, options = {}) {
+async function buildCourseTestPaper(config, courseId) {
   assertConfigHasQuizSources(config, 'bài kiểm tra toàn khóa');
 
+  const sectionsData = await loadCourseTestSections(courseId, config);
+  return buildPaperFromConfig(config, sectionsData, {
+    chapterSectionCounts: config.chapterSectionCounts ?? {},
+  });
+}
+
+/** Load section ngân hàng câu hỏi cho bài test toàn khóa. */
+async function loadCourseTestSections(courseId, config) {
   const selectedChapterIds = (config?.selectedChapterIds ?? [])
     .map(String)
     .filter(Boolean);
@@ -87,9 +95,14 @@ async function buildCourseTestPaper(config, courseId, options = {}) {
     throw error;
   }
 
-  const sectionsData = await loadSectionsForPaths(courseId, selectedChapterIds);
+  return loadSectionsForPaths(courseId, selectedChapterIds);
+}
+
+/** Random đề khi đã có sẵn config + sectionsData (sau bước đề xuất). */
+async function buildCourseTestPaperWithSections(config, sectionsData) {
+  assertConfigHasQuizSources(config, 'bài kiểm tra toàn khóa');
   return buildPaperFromConfig(config, sectionsData, {
-    chapterWeights: options.chapterWeights ?? config.chapterWeights ?? {},
+    chapterSectionCounts: config.chapterSectionCounts ?? {},
   });
 }
 
@@ -109,6 +122,8 @@ function getConfiguredSkillTypes(config = {}) {
 module.exports = {
   buildChapterTestPaper,
   buildCourseTestPaper,
+  buildCourseTestPaperWithSections,
+  loadCourseTestSections,
   getConfiguredSkillTypes,
   hasConfiguredQuizSources,
   hasMentorQuestionConfigs,

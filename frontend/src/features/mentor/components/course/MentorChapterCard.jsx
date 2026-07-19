@@ -25,7 +25,9 @@ import {
   chapterHasContent,
   filterLearningMaterials,
   getChapterPublishBlockReason,
+  getChapterUnpublishBlockReason,
   getLessonPublishBlockReason,
+  getLessonUnpublishBlockReason,
   isEditDirty,
   isNewUnsavedPath,
   isNodeActive,
@@ -69,7 +71,7 @@ function getMaterialToolbarSummary(material) {
   return `${typeLabel} · ${title || 'Chưa đặt tiêu đề'}`;
 }
 
-function PathChapterActions({ path, onChange, onDeleteNewPath, disabled = false, publishBlockReason = null }) {
+function PathChapterActions({ path, onChange, onDeleteNewPath, disabled = false, publishBlockReason = null, hideBlockReason = null }) {
   if (isNewUnsavedPath(path)) {
     return (
       <AppButton
@@ -91,6 +93,7 @@ function PathChapterActions({ path, onChange, onDeleteNewPath, disabled = false,
       onChange={onChange}
       disabled={disabled}
       publishBlockReason={publishBlockReason}
+      hideBlockReason={hideBlockReason}
     />
   );
 }
@@ -113,6 +116,8 @@ export default function MentorChapterCard({
   onMaterialDelete,
   onMaterialReorder,
   disabled = false,
+  allowNodeDelete = true,
+  allowMaterialDelete = true,
   isSaved = false,
   saving = false,
   onSave,
@@ -136,6 +141,7 @@ export default function MentorChapterCard({
   showNodeContent = true,
   showMaterialContent = true,
   onRequestContentNavigation = null,
+  chapterQuizPathIds = null,
 }) {
   const nodesNormal = path.nodes ?? path.Nodes ?? [];
   const lessonCount = nodesNormal.length;
@@ -143,6 +149,7 @@ export default function MentorChapterCard({
   const pathPublishBlockReason = !chapterCanPublish(path)
     ? getChapterPublishBlockReason(path)
     : null;
+  const pathHideBlockReason = getChapterUnpublishBlockReason(path, { chapterQuizPathIds });
   const [activeLessonId, setActiveLessonId] = useState(
     () => focusLessonId ?? nodesNormal[0]?.tempId ?? null,
   );
@@ -268,6 +275,9 @@ export default function MentorChapterCard({
   const activeNodePublishBlockReason = activeLesson && !isNodeActive(activeLesson) && !lessonCanPublish(activeLesson)
     ? getLessonPublishBlockReason(activeLesson)
     : null;
+  const activeNodeHideBlockReason = activeLesson
+    ? getLessonUnpublishBlockReason(activeLesson, path, { chapterQuizPathIds })
+    : null;
   const activeMaterials = filterLearningMaterials(activeLesson?.Materials ?? activeLesson?.materials ?? []);
   const activeNodeDirty = Boolean(
     showNodeUpdate
@@ -332,6 +342,7 @@ export default function MentorChapterCard({
   }, [activeMaterialIndex]);
 
   const handleNodeDelete = useCallback((nodeTempId) => {
+    if (!allowNodeDelete || !onNodeDelete) return;
     if (nodeTempId === activeLessonId) {
       const idx = nodesNormal.findIndex((n) => n.tempId === nodeTempId);
       const remaining = nodesNormal.filter((n) => n.tempId !== nodeTempId);
@@ -340,9 +351,10 @@ export default function MentorChapterCard({
       setActiveMaterialId(null);
     }
     onNodeDelete(path.tempId, nodeTempId);
-  }, [activeLessonId, nodesNormal, onNodeDelete, path.tempId]);
+  }, [allowNodeDelete, activeLessonId, nodesNormal, onNodeDelete, path.tempId]);
 
   const handleMaterialDelete = useCallback((nodeTempId, materialTempId) => {
+    if (!allowMaterialDelete || !onMaterialDelete) return;
     if (nodeTempId === activeLessonId && materialTempId === activeMaterialId) {
       const materials = filterLearningMaterials(
         activeLesson?.Materials ?? activeLesson?.materials ?? [],
@@ -353,7 +365,7 @@ export default function MentorChapterCard({
       setActiveMaterialId(remaining[nextIdx]?.tempId ?? null);
     }
     onMaterialDelete(path.tempId, nodeTempId, materialTempId);
-  }, [activeLesson, activeLessonId, activeMaterialId, onMaterialDelete, path.tempId]);
+  }, [allowMaterialDelete, activeLesson, activeLessonId, activeMaterialId, onMaterialDelete, path.tempId]);
 
   useEffect(() => {
     if (!chapterSectionOpen && !lessonSectionOpen) return;
@@ -507,14 +519,14 @@ export default function MentorChapterCard({
             onChange={(materialTempId, patch) =>
               onMaterialChange(path.tempId, activeLesson.tempId, materialTempId, patch)
             }
-            onDelete={(materialTempId) =>
-              handleMaterialDelete(activeLesson.tempId, materialTempId)
-            }
+            onDelete={allowMaterialDelete
+              ? (materialTempId) => handleMaterialDelete(activeLesson.tempId, materialTempId)
+              : undefined}
             disabled={disabled}
             courseId={courseId}
             chapterId={chapterId}
             tabMode
-            hideDelete
+            hideDelete={!allowMaterialDelete}
           />
         ) : (
           <Box sx={{ py: 2, px: 0 }}>
@@ -557,13 +569,14 @@ export default function MentorChapterCard({
           onChange={(materialTempId, patch) =>
             onMaterialChange(path.tempId, activeLesson.tempId, materialTempId, patch)
           }
-          onDelete={(materialTempId) =>
-            handleMaterialDelete(activeLesson.tempId, materialTempId)
-          }
+          onDelete={allowMaterialDelete
+            ? (materialTempId) => handleMaterialDelete(activeLesson.tempId, materialTempId)
+            : undefined}
           disabled={disabled}
           courseId={courseId}
           chapterId={chapterId}
           tabMode
+          hideDelete={!allowMaterialDelete}
         />
       </Box>
     );
@@ -633,17 +646,19 @@ export default function MentorChapterCard({
               hasContent={materialHasContent(activeMaterial)}
               summary={getMaterialToolbarSummary(activeMaterial)}
               actions={
-                <IconButton
-                  size="small"
-                  onClick={() =>
-                    handleMaterialDelete(activeLesson.tempId, activeMaterial.tempId)
-                  }
-                  disabled={disabled}
-                  aria-label="Xóa học liệu"
-                  sx={DELETE_ICON_BTN_SX}
-                >
-                  <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
+                allowMaterialDelete ? (
+                  <IconButton
+                    size="small"
+                    onClick={() =>
+                      handleMaterialDelete(activeLesson.tempId, activeMaterial.tempId)
+                    }
+                    disabled={disabled}
+                    aria-label="Xóa học liệu"
+                    sx={DELETE_ICON_BTN_SX}
+                  >
+                    <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                ) : null
               }
               sx={{ borderBottom: 'none' }}
             />
@@ -729,13 +744,14 @@ export default function MentorChapterCard({
               onChange={(materialTempId, patch) =>
                 onMaterialChange(path.tempId, activeLesson.tempId, materialTempId, patch)
               }
-              onDelete={(materialTempId) =>
-                handleMaterialDelete(activeLesson.tempId, materialTempId)
-              }
+              onDelete={allowMaterialDelete
+                ? (materialTempId) => handleMaterialDelete(activeLesson.tempId, materialTempId)
+                : undefined}
               disabled={disabled}
               courseId={courseId}
               chapterId={chapterId}
               tabMode
+              hideDelete={!allowMaterialDelete}
             />
           ) : (
             <Box sx={{ px: 2, py: 2.5 }}>
@@ -760,15 +776,17 @@ export default function MentorChapterCard({
           hasContent={lessonHasContent(activeLesson)}
           summary={`Bài ${activeLessonIndex + 1}${activeLesson.NodeName ? ` · ${String(activeLesson.NodeName).trim()}` : ''} · ${activeMaterials.length} học liệu`}
           actions={
-            <IconButton
-              size="small"
-              onClick={() => handleNodeDelete(activeLesson.tempId)}
-              disabled={disabled}
-              aria-label="Xóa bài học"
-              sx={DELETE_ICON_BTN_SX}
-            >
-              <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-            </IconButton>
+            allowNodeDelete ? (
+              <IconButton
+                size="small"
+                onClick={() => handleNodeDelete(activeLesson.tempId)}
+                disabled={disabled}
+                aria-label="Xóa bài học"
+                sx={DELETE_ICON_BTN_SX}
+              >
+                <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            ) : null
           }
         />
       );
@@ -797,15 +815,17 @@ export default function MentorChapterCard({
           hasContent={lessonHasContent(activeLesson)}
           summary={`Bài ${activeLessonIndex + 1} · ${activeMaterials.length} học liệu`}
           actions={
-            <IconButton
-              size="small"
-              onClick={() => handleNodeDelete(activeLesson.tempId)}
-              disabled={disabled}
-              aria-label="Xóa bài học"
-              sx={DELETE_ICON_BTN_SX}
-            >
-              <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-            </IconButton>
+            allowNodeDelete ? (
+              <IconButton
+                size="small"
+                onClick={() => handleNodeDelete(activeLesson.tempId)}
+                disabled={disabled}
+                aria-label="Xóa bài học"
+                sx={DELETE_ICON_BTN_SX}
+              >
+                <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            ) : null
           }
         />
       ) : null}
@@ -826,10 +846,16 @@ export default function MentorChapterCard({
             onChange={onNodeChange}
             disabled={disabled}
             publishBlockReason={activeNodePublishBlockReason}
+            hideBlockReason={activeNodeHideBlockReason}
           />
           {activeNodePublishBlockReason ? (
             <Typography sx={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
               {activeNodePublishBlockReason}
+            </Typography>
+          ) : null}
+          {activeNodeHideBlockReason ? (
+            <Typography sx={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
+              {activeNodeHideBlockReason}
             </Typography>
           ) : null}
           {needsPathFirst ? (
@@ -931,14 +957,14 @@ export default function MentorChapterCard({
                   expanded={expandedNodes[node.tempId] !== false}
                   onToggle={() => onToggleNode(node.tempId)}
                   onChange={onNodeChange}
-                  onDelete={() => handleNodeDelete(node.tempId)}
+                  onDelete={allowNodeDelete ? () => handleNodeDelete(node.tempId) : undefined}
                   onAddMaterial={() => onAddMaterial(path.tempId, node.tempId)}
                   onMaterialChange={(materialTempId, patch) =>
                     onMaterialChange(path.tempId, node.tempId, materialTempId, patch)
                   }
-                  onMaterialDelete={(materialTempId) =>
-                    handleMaterialDelete(node.tempId, materialTempId)
-                  }
+                  onMaterialDelete={allowMaterialDelete
+                    ? (materialTempId) => handleMaterialDelete(node.tempId, materialTempId)
+                    : undefined}
                   onMaterialReorder={(fromIndex, toIndex) =>
                     onMaterialReorder(path.tempId, node.tempId, fromIndex, toIndex)
                   }
@@ -1018,6 +1044,7 @@ export default function MentorChapterCard({
           onDeleteNewPath={onDeleteNewPath}
           disabled={disabled}
           publishBlockReason={pathPublishBlockReason}
+          hideBlockReason={pathHideBlockReason}
         />
       ) : showChapterEdit && isNewUnsavedPath(path) ? (
         <PathChapterActions
@@ -1026,6 +1053,7 @@ export default function MentorChapterCard({
           onDeleteNewPath={onDeleteNewPath}
           disabled={disabled}
           publishBlockReason={pathPublishBlockReason}
+          hideBlockReason={pathHideBlockReason}
         />
       ) : null}
     </Box>
@@ -1049,6 +1077,7 @@ export default function MentorChapterCard({
             onChange={onChange}
             disabled={disabled}
             publishBlockReason={pathPublishBlockReason}
+            hideBlockReason={pathHideBlockReason}
           />
         </Box>
       ) : null}
@@ -1250,6 +1279,7 @@ export default function MentorChapterCard({
           onDeleteNewPath={onDeleteNewPath}
           disabled={disabled}
           publishBlockReason={pathPublishBlockReason}
+          hideBlockReason={pathHideBlockReason}
         />
       </Box>
 

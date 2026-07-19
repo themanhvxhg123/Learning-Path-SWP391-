@@ -728,6 +728,26 @@ const updateCourseThumbnail = async (courseId, thumbnailPath) => {
     `);
 };
 
+const assertCourseCanPublish = async (courseId) => {
+  const request = new sql.Request();
+  request.input("CourseId", sql.Int, Number(courseId));
+
+  const result = await request.query(`
+        SELECT COUNT(*) AS PublishedPathCount
+        FROM dbo.Paths
+        WHERE CourseId = @CourseId
+          AND ISNULL(IsActive, 1) = 1
+    `);
+
+  if (Number(result.recordset[0]?.PublishedPathCount ?? 0) < 1) {
+    const error = new Error(
+      "Khóa học cần ít nhất 1 chương được xuất bản trước khi xuất bản.",
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
 // set course => publish
 const setPublishCourse = async (courseId) => {
   const request = new sql.Request();
@@ -843,8 +863,14 @@ const markNodeAsCompleted = async (courseId, userId, nodeId) => {
     const insertQuery = `
             IF NOT EXISTS (SELECT 1 FROM User_Nodes WHERE UserId = @userId AND NodeId = @nodeId)
             BEGIN
-                INSERT INTO User_Nodes (UserId, NodeId, IsCompleted) 
-                VALUES (@userId, @nodeId, 1);
+                INSERT INTO User_Nodes (UserId, NodeId, IsCompleted, CompletedAt)
+                VALUES (@userId, @nodeId, 1, GETDATE());
+            END
+            ELSE
+            BEGIN
+                UPDATE User_Nodes
+                SET IsCompleted = 1, CompletedAt = GETDATE()
+                WHERE UserId = @userId AND NodeId = @nodeId;
             END
         `;
     await new sql.Request()
@@ -901,6 +927,7 @@ module.exports = {
   getMyEnrolledCourses,
   enrollCourse,
   setDraftCourse,
+  assertCourseCanPublish,
   setPublishCourse,
   getCourseLearningPath,
   markNodeAsCompleted,
