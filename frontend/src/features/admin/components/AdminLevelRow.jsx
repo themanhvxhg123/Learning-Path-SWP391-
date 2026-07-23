@@ -1,4 +1,5 @@
-import { Box, Chip, Typography } from '@mui/material';
+import { Box, Chip, IconButton, Tooltip, Typography, alpha } from '@mui/material';
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import {
   ADMIN_CATALOG_STATUS_CHIP_SX,
   ADMIN_CATALOG_STATUS_LABELS,
@@ -44,7 +45,7 @@ function DesktopValue({ value }) {
   );
 }
 
-export default function AdminLevelRow({ level, onEdit }) {
+export default function AdminLevelRow({ level, onEdit, onDelete }) {
   const statusSx = ADMIN_CATALOG_STATUS_CHIP_SX[level.status] ?? ADMIN_CATALOG_STATUS_CHIP_SX.ACTIVE;
 
   return (
@@ -100,11 +101,35 @@ export default function AdminLevelRow({ level, onEdit }) {
         <DesktopValue value={formatLevelDate(level.createdAt)} />
       </Box>
 
-      <AdminCatalogEditButton
-        ariaLabel="Chỉnh sửa trình độ"
-        title="Chỉnh sửa trình độ"
-        onClick={() => onEdit?.(level)}
-      />
+      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+        <AdminCatalogEditButton
+          ariaLabel="Chỉnh sửa trình độ"
+          title="Chỉnh sửa trình độ"
+          onClick={() => onEdit?.(level)}
+          bare
+        />
+        <Tooltip title="Xoá trình độ">
+          <IconButton
+            size="small"
+            aria-label="Xoá trình độ"
+            onClick={() => onDelete?.(level)}
+            sx={{
+              width: 34,
+              height: 34,
+              borderRadius: '10px',
+              border: '1px solid rgba(15,23,42,0.08)',
+              color: MUTED,
+              '&:hover': {
+                color: '#EF4444',
+                bgcolor: alpha('#EF4444', 0.06),
+                borderColor: alpha('#EF4444', 0.2),
+              },
+            }}
+          >
+            <DeleteOutlinedIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
     </Box>
   );
 }

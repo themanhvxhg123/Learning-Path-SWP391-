@@ -8,6 +8,7 @@ import {
   alpha,
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import {
   ADMIN_ACCOUNT_ROLE_CHIP_SX,
   ADMIN_ACCOUNT_ROLE_LABELS,
@@ -52,7 +53,7 @@ function DesktopValue({ value }) {
   );
 }
 
-export default function AdminAccountRow({ account, onEdit }) {
+export default function AdminAccountRow({ account, onEdit, onDelete }) {
   const roleSx = ADMIN_ACCOUNT_ROLE_CHIP_SX[account.role] ?? ADMIN_ACCOUNT_ROLE_CHIP_SX.Student;
   const statusSx = ADMIN_ACCOUNT_STATUS_CHIP_SX[account.status] ?? ADMIN_ACCOUNT_STATUS_CHIP_SX.ACTIVE;
 
@@ -148,7 +149,7 @@ export default function AdminAccountRow({ account, onEdit }) {
         <DesktopValue value={formatAccountDate(account.createdAt)} />
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, justifySelf: 'end' }}>
+      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: { xs: 'flex-start', md: 'flex-end' }, justifySelf: 'end' }}>
         <Tooltip title="Chỉnh sửa vai trò & trạng thái">
           <IconButton
             size="small"
@@ -168,6 +169,27 @@ export default function AdminAccountRow({ account, onEdit }) {
             }}
           >
             <EditOutlinedIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Xoá tài khoản">
+          <IconButton
+            size="small"
+            aria-label="Xoá tài khoản"
+            onClick={() => onDelete?.(account)}
+            sx={{
+              width: 34,
+              height: 34,
+              borderRadius: '10px',
+              border: '1px solid rgba(15,23,42,0.08)',
+              color: MUTED,
+              '&:hover': {
+                color: '#EF4444',
+                bgcolor: alpha('#EF4444', 0.06),
+                borderColor: alpha('#EF4444', 0.2),
+              },
+            }}
+          >
+            <DeleteOutlinedIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Tooltip>
       </Box>
