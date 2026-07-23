@@ -4,11 +4,12 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { toast } from '@/shared/ui/Toast';
 import AppButton from '@/shared/ui/AppButton';
 import AppPagination from '@/shared/ui/AppPagination';
+import ConfirmDialog from '@/shared/ui/ConfirmDialog';
 import AdminAccountsToolbar from '@/features/admin/components/AdminAccountsToolbar';
 import AdminAccountList from '@/features/admin/components/AdminAccountList';
 import AdminAccountFormDialog from '@/features/admin/components/AdminAccountFormDialog';
 import AdminAccountCreateDialog from '@/features/admin/components/AdminAccountCreateDialog';
-import { createAccount, getAccounts, updateAccount } from '@/features/admin/services/adminAccountService';
+import { createAccount, getAccounts, updateAccount, deleteAccount } from '@/features/admin/services/adminAccountService';
 import {
   ADMIN_ACCOUNT_ROLE_OPTIONS,
   ADMIN_ACCOUNT_STATUS_OPTIONS,
@@ -41,6 +42,9 @@ export default function AdminAccountManagementPage() {
   const [editingAccount, setEditingAccount] = useState(null);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const queryState = useMemo(
     () => parseAdminAccountListParams(searchParams),
@@ -165,6 +169,30 @@ export default function AdminAccountManagementPage() {
     }
   };
 
+  const openDeleteConfirm = (account) => {
+    setDeletingAccount(account);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingAccount) return;
+
+    setDeleting(true);
+    try {
+      const res = await deleteAccount(deletingAccount.id);
+      if (!res.ok) {
+        toast.error(res.message ?? 'Không thể xoá tài khoản');
+        return;
+      }
+      toast.success('Đã xoá tài khoản thành công');
+      setDeleteConfirmOpen(false);
+      setDeletingAccount(null);
+      await loadAccounts();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto' }}>
       <Box
@@ -228,6 +256,7 @@ export default function AdminAccountManagementPage() {
         hasAnyAccounts={accounts.length > 0}
         isFiltered={showReset || Boolean(queryState.q?.trim())}
         onEdit={openEditDialog}
+        onDelete={openDeleteConfirm}
         onClearFilters={handleReset}
       />
 
@@ -258,6 +287,26 @@ export default function AdminAccountManagementPage() {
         }}
         onSubmit={handleCreateSubmit}
         saving={creating}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => {
+          if (deleting) return;
+          setDeleteConfirmOpen(false);
+          setDeletingAccount(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Xác nhận xoá tài khoản"
+        message={
+          deletingAccount
+            ? `Bạn có chắc chắn muốn xoá tài khoản "${deletingAccount.fullName}" (${deletingAccount.email})? Hành động này không thể hoàn tác.`
+            : ''
+        }
+        confirmLabel="Xoá"
+        cancelLabel="Hủy"
+        loading={deleting}
+        destructive
       />
     </Box>
   );

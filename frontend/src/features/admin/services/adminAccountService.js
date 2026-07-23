@@ -1,7 +1,7 @@
 /**
  * Admin Account Service — calls real backend APIs.
  */
-import { apiGet, apiPost, apiPut } from '@/features/admin/services/adminApiClient';
+import { apiGet, apiPost, apiPut, apiDelete } from '@/features/admin/services/adminApiClient';
 
 /**
  * Map a backend user record to the frontend account shape.
@@ -102,4 +102,13 @@ export async function resetAccountPassword(id) {
   }
   const email = detailRes.data.Email || '';
   return { ok: true, message: `Đã gửi email đặt lại mật khẩu tới ${email}` };
+}
+
+export async function deleteAccount(id) {
+  const userId = Number(id);
+  const res = await apiDelete(`/users/${userId}`);
+  if (!res.ok) {
+    return { ok: false, message: res.message || 'Không thể xoá tài khoản' };
+  }
+  return { ok: true, message: 'Đã xoá tài khoản thành công' };
 }

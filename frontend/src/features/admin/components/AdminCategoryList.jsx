@@ -52,6 +52,7 @@ export default function AdminCategoryList({
   hasAnyCategories,
   isFiltered,
   onEdit,
+  onDelete,
   onClearFilters,
 }) {
   if (loading) {
@@ -103,7 +104,7 @@ export default function AdminCategoryList({
     >
       <ListHeader />
       {categories.map((category) => (
-        <AdminCategoryRow key={category.id} category={category} onEdit={onEdit} />
+        <AdminCategoryRow key={category.id} category={category} onEdit={onEdit} onDelete={onDelete} />
       ))}
     </Box>
   );

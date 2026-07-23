@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from '@/shared/ui/Toast';
 import AppButton from '@/shared/ui/AppButton';
 import AppPagination from '@/shared/ui/AppPagination';
+import ConfirmDialog from '@/shared/ui/ConfirmDialog';
 import AdminCatalogToolbar from '@/features/admin/components/AdminCatalogToolbar';
 import AdminLevelList from '@/features/admin/components/AdminLevelList';
 import AdminLevelCreateDialog from '@/features/admin/components/AdminLevelCreateDialog';
@@ -18,6 +19,7 @@ import {
   createLevel,
   getLevels,
   updateLevel,
+  deleteLevel,
 } from '@/features/admin/services/adminLevelService';
 import { filterAndSortLevels } from '@/features/admin/utils/adminLevelUtils';
 import {
@@ -44,6 +46,9 @@ export default function AdminLevelManagementPage() {
   const [editingLevel, setEditingLevel] = useState(null);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingLevel, setDeletingLevel] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const queryState = useMemo(
     () => parseAdminLevelListParams(searchParams),
@@ -167,6 +172,30 @@ export default function AdminLevelManagementPage() {
     }
   };
 
+  const openDeleteConfirm = (level) => {
+    setDeletingLevel(level);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingLevel) return;
+
+    setDeleting(true);
+    try {
+      const res = await deleteLevel(deletingLevel.id);
+      if (!res.ok) {
+        toast.error(res.message ?? 'Không thể xoá trình độ');
+        return;
+      }
+      toast.success('Đã xoá trình độ thành công');
+      setDeleteConfirmOpen(false);
+      setDeletingLevel(null);
+      await loadLevels();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto' }}>
       <Box
@@ -231,6 +260,7 @@ export default function AdminLevelManagementPage() {
         hasAnyLevels={levels.length > 0}
         isFiltered={showReset || Boolean(queryState.q?.trim())}
         onEdit={openEditDialog}
+        onDelete={openDeleteConfirm}
         onClearFilters={handleReset}
       />
 
@@ -262,6 +292,26 @@ export default function AdminLevelManagementPage() {
         onSubmit={handleEditSubmit}
         saving={saving}
         existingNames={existingNames}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => {
+          if (deleting) return;
+          setDeleteConfirmOpen(false);
+          setDeletingLevel(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Xác nhận xoá trình độ"
+        message={
+          deletingLevel
+            ? `Bạn có chắc chắn muốn xoá trình độ "${deletingLevel.displayName}"? Hành động này không thể hoàn tác.`
+            : ''
+        }
+        confirmLabel="Xoá"
+        cancelLabel="Hủy"
+        loading={deleting}
+        destructive
       />
     </Box>
   );
