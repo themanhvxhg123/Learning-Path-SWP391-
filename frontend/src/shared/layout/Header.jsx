@@ -17,6 +17,7 @@ import {
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Logo from "@/shared/ui/Logo";
@@ -39,6 +40,7 @@ import {
   getStoredAvatarUrl,
 } from '@/features/profile/utils/profileAvatarUtils';
 import StreakBadge from "@/shared/ui/StreakBadge";
+import ChangePasswordDialog from "@/features/auth/components/ChangePasswordDialog";
 const MENU_CLOSE_DELAY = 200;
 const KEYWORD_DEBOUNCE_MS = 300;
 const PROJECT_NAME = "S.T.A.R Learning Path";
@@ -140,6 +142,7 @@ export default function Header({
   const [search, setSearch] = useState("");
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const userMenuOpen = Boolean(userMenuAnchor);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     if (isMentorListSearchPage) {
@@ -687,7 +690,19 @@ export default function Header({
                     );
                   })}
 
+                  <MenuItem
+                    onClick={() => {
+                      closeUserMenu();
+                      setChangePasswordOpen(true);
+                    }}
+                    sx={menuItemSx}
+                  >
+                    <LockOutlinedIcon className="user-menu-icon" sx={{ fontSize: 19, color: MUTED }} />
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Đổi mật khẩu</Typography>
+                  </MenuItem>
+
                   <Divider sx={{ my: 0.75, borderColor: "rgba(8,145,178,0.08)" }} />
+
 
                   <MenuItem onClick={handleLogout} sx={logoutItemSx}>
                     <LogoutRoundedIcon className="user-menu-icon" sx={{ fontSize: 19 }} />
@@ -699,6 +714,11 @@ export default function Header({
           </Box>
         )}
       </Toolbar>
+
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </AppBar>
   );
 }
