@@ -104,6 +104,7 @@ const logoutItemSx = {
  * @param {string} [profilePath="/profile"] - Đường dẫn tới trang Profile.
  * @param {boolean} [showMyCoursesButton=true] - Có hiển thị nút "Khóa học của tôi" hay không.
  * @param {boolean} [hideProfileMenuItem=false] - Có ẩn tùy chọn "Hồ sơ cá nhân" trong Menu hay không.
+ * @param {boolean} [showChangePassword=false] - Có hiển thị nút "Đổi mật khẩu" trong Menu hay không (chỉ dùng cho admin).
  */
 export default function Header({
   showUser = true,
@@ -113,7 +114,9 @@ export default function Header({
   profilePath = "/profile",
   showMyCoursesButton = true,
   hideProfileMenuItem = false,
+  showChangePassword = false,
 }) {
+
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -690,18 +693,21 @@ export default function Header({
                     );
                   })}
 
-                  <MenuItem
-                    onClick={() => {
-                      closeUserMenu();
-                      setChangePasswordOpen(true);
-                    }}
-                    sx={menuItemSx}
-                  >
-                    <LockOutlinedIcon className="user-menu-icon" sx={{ fontSize: 19, color: MUTED }} />
-                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Đổi mật khẩu</Typography>
-                  </MenuItem>
+                  {showChangePassword && (
+                    <MenuItem
+                      onClick={() => {
+                        closeUserMenu();
+                        setChangePasswordOpen(true);
+                      }}
+                      sx={menuItemSx}
+                    >
+                      <LockOutlinedIcon className="user-menu-icon" sx={{ fontSize: 19, color: MUTED }} />
+                      <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Đổi mật khẩu</Typography>
+                    </MenuItem>
+                  )}
 
                   <Divider sx={{ my: 0.75, borderColor: "rgba(8,145,178,0.08)" }} />
+
 
 
                   <MenuItem onClick={handleLogout} sx={logoutItemSx}>

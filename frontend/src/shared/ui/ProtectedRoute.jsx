@@ -9,6 +9,10 @@ import {
 
 /**
  * ProtectedRoute - Lớp bảo vệ phân quyền (Role-Based Access Control)
+ * 
+ * Nếu user không có role phù hợp:
+ *  - Nếu có roleRedirects (dùng cho shell-level), ưu tiên redirect theo roleRedirects
+ *  - Nếu không có roleRedirects, redirect về /unauthorized
  */
 export default function ProtectedRoute({ allowedRoles, roleRedirects, children }) {
   const user = getUser();
@@ -25,10 +29,15 @@ export default function ProtectedRoute({ allowedRoles, roleRedirects, children }
     // Dò xem role của user có nằm trong allowedRoles không
     const hasAccess = allowedRoles.some((role) => userRoles.includes(role.toLowerCase()));
 
-    // Không có quyền truy cập -> Mở cẩm nang roleRedirects để tống cổ đi
+    // Không có quyền truy cập
     if (!hasAccess) {
-      const redirectTo = resolveRoleRedirectPath(user, roleRedirects) ?? getRoleDefaultPath(user);
-      return <Navigate to={redirectTo} replace />;
+      // Nếu có roleRedirects (shell-level block), ưu tiên redirect theo roleRedirects
+      if (roleRedirects && Object.keys(roleRedirects).length > 0) {
+        const redirectTo = resolveRoleRedirectPath(user, roleRedirects) ?? getRoleDefaultPath(user);
+        return <Navigate to={redirectTo} replace />;
+      }
+      // Không có roleRedirects -> route-level access denied -> redirect /unauthorized
+      return <Navigate to="/unauthorized" replace />;
     }
   }
 
