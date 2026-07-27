@@ -100,7 +100,7 @@ const getAttemptCountByUserAndTest = async (userId, testId) => {
     const result = await request.query(`
         SELECT COUNT(*) as count
         FROM dbo.Test_Attempts
-        WHERE UserId = @userId AND TestId = @testId
+        WHERE UserId = @userId AND TestId = @testId AND StartedAt >= DATEADD(day, -1, GETDATE())
     `);
     return result.recordset[0].count;
 };
