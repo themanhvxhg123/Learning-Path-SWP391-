@@ -3,7 +3,7 @@ const courseModel = require('../models/coursesModel');
 const streakService = require("../services/streakService");
 const courseCommentsModel = require('../models/courseCommentsModel');
 const { validateCourseThumbnailDataUrl } = require('../middlewares/courseThumbnailMiddleware');
-
+// khoá học tổng 
 const getStudentCourses = async (req, res) => {
   try {
     const filters = {
@@ -33,7 +33,7 @@ const getStudentCourses = async (req, res) => {
     });
   }
 };
-
+// khoá học của tôi
 const getMyCourses = async (req, res) => {
   try {
     const { userId, roleName } = req.body;
@@ -407,6 +407,12 @@ const createCourseComment = async (req, res) => {
     });
   } catch (error) {
     console.error('createCourseComment error:', error.message);
+    
+    // Nếu lỗi là do chạm trần giới hạn (EditCount >= 1) được ném ra từ Model
+    if (error.message === 'Bạn chỉ được sửa đánh giá 1 lần duy nhất!') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    
     return res.status(500).json({ success: false, message: 'Lỗi server khi gửi bình luận' });
   }
 };

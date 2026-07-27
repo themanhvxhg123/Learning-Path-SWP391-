@@ -58,6 +58,8 @@ const sendOtpEmail = async ({ to, subject, html, otpCode, label }) => {
     return { emailSent: true };
   } catch (err) {
     console.error(`[Email Error] ${label}:`, err.message);
+    // test trc khi có email tổng để gửi
+    // đang chạy localhost thì bỏ vào terminal
     if (!isProduction) {
       console.warn(`[Email Dev Fallback] OTP ${label}: ${otpCode} → ${to}`);
       return { emailSent: false };
@@ -350,9 +352,10 @@ const verifyOtp = async (req, res) => {
       const deleteReq = new sql.Request(transaction);
       deleteReq.input('email', sql.NVarChar(150), record.Email);
       await deleteReq.query('DELETE FROM OTP_Verification WHERE Email = @email');
-
+      // lưu thẳng vào db
       await transaction.commit();
     } catch (dbErr) {
+      // nếu lỗi thì undo thì bảng OTP vẫn mới
       await transaction.rollback();
       throw dbErr;
     }

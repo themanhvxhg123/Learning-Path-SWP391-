@@ -400,7 +400,7 @@ function HeroSection({ onExplore, onViewNews }) {
  */
 function ContinueSection({ course, onContinue, onExplore }) {
   const theme = useTheme();
-
+// chưa học bao giờ (new user)
   if (!course) {
     return (
       <Box sx={{ mb: { xs: 7, md: 9 } }}>
@@ -465,7 +465,7 @@ function ContinueSection({ course, onContinue, onExplore }) {
       </Box>
     );
   }
-
+ //trh còn khoá học (phổ biến nhất)
   const progress = Math.min(Math.max(course.progressPercentage ?? 0, 0), 100);
   const progressColor = getProgressColor(progress);
 
@@ -865,7 +865,7 @@ function NewsSection() {
 }
 
 /* ─── Section 4: Suggested courses ──────────────────────── */
-
+//Hiển thị khoá học
 function CourseGrid({ courses, onNavigateCourse }) {
   return (
     <Box sx={COURSE_GRID_SX}>
@@ -879,7 +879,7 @@ function CourseGrid({ courses, onNavigateCourse }) {
     </Box>
   );
 }
-
+//khung báo
 function ForYouPlaceholder({ isLoggedIn, learningGoal, hasCategories, onExplore, onLogin }) {
   return (
     <Box
@@ -1497,6 +1497,7 @@ export default function HomePage() {
       try {
         const params = new URLSearchParams();
         userCategories.forEach((c) => params.append("category", String(c.categoryId)));
+        // chỉ hiện chưa đăng kí 
         params.append("status", "not_enrolled");
 
         const coursesRes = await fetch(
