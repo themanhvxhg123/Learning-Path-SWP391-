@@ -1,21 +1,22 @@
-import { ROLE_DEFAULT_PATHS } from '@/features/auth/utils/authUtils';
+/** Redirect khi role không được phép vào shell — tất cả đều về /unauthorized. */
+const UNAUTHORIZED = '/unauthorized';
 
 /** Redirect khi role không được phép vào shell Student. */
 export const STUDENT_SHELL_BLOCK_REDIRECTS = {
-  Mentor: ROLE_DEFAULT_PATHS.Mentor,
-  Admin: ROLE_DEFAULT_PATHS.Admin,
+  Mentor: UNAUTHORIZED,
+  Admin: UNAUTHORIZED,
 };
 
 /** Redirect khi role không được phép vào shell Mentor. */
 export const MENTOR_SHELL_BLOCK_REDIRECTS = {
-  Student: ROLE_DEFAULT_PATHS.StudentBrowse,
-  Admin: ROLE_DEFAULT_PATHS.Admin,
+  Student: UNAUTHORIZED,
+  Admin: UNAUTHORIZED,
 };
 
 /** Redirect khi role không được phép vào shell Admin. */
 export const ADMIN_SHELL_BLOCK_REDIRECTS = {
-  Mentor: ROLE_DEFAULT_PATHS.Mentor,
-  Student: ROLE_DEFAULT_PATHS.StudentBrowse,
+  Mentor: UNAUTHORIZED,
+  Student: UNAUTHORIZED,
 };
 
 /** Shell học viên: courses (Admin được xem), profile (Student). */
