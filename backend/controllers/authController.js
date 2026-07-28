@@ -145,7 +145,7 @@ const login = async (req, res) => {
     // 1. Lấy thông tin user
     const userReq = new sql.Request();
     userReq.input('email', sql.NVarChar(150), normalizedEmail);
-    const userResult = await userReq.query('SELECT UserId, FullName, Email, Phone, Password, IsFirstLogin, IsActive FROM Users WHERE Email = @email');
+    const userResult = await userReq.query('SELECT UserId, FullName, Email, Phone, Password, IsFirstLogin, IsActive, AvatarUrl FROM Users WHERE Email = @email');
 
     if (userResult.recordset.length === 0)
       return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng.' });
@@ -196,6 +196,7 @@ const login = async (req, res) => {
         email: user.Email,
         phone: user.Phone,
         isFirstLogin: user.IsFirstLogin === true || user.IsFirstLogin === 1,
+        avatarUrl: user.AvatarUrl,
         roles,
       },
     });

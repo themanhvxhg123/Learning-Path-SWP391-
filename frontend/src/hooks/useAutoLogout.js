@@ -13,6 +13,9 @@ export function useAutoLogout() {
         const logoutUser = () => {
             localStorage.removeItem('user');
             localStorage.removeItem('token');
+            localStorage.removeItem('avatarUrl');
+            localStorage.removeItem('rawAvatar');
+            localStorage.removeItem('rawFrame');
             localStorage.removeItem('lastActivity');
             alert('Đã hết phiên đăng nhập do bạn không hoạt động trong thời gian dài.');
             navigate('/login');
