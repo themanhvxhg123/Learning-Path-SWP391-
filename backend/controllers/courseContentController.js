@@ -1,3 +1,8 @@
+/**
+ * Content REST — mỗi export khớp một route trong mentorRoutes.js.
+ * Luồng: FE saveCoursePath → handler ở đây → courseContentSaveModel (SQL).
+ * Quyền: assertMentorOwnsCourse / assertPathAccess / assertNodeAccess / assertMaterialAccess.
+ */
 const coursesModel = require('../Models/coursesModel');
 const courseContentSaveModel = require('../Models/courseContentSaveModel');
 const chapterQuizConfigModel = require('../Models/chapterQuizConfigModel');
@@ -453,6 +458,7 @@ const getMaterialById = async (req, res) => {
   }
 };
 
+/** Proxy tải file từ Cloudinary — mentor bấm download (attachment). */
 const downloadMaterialFile = async (req, res) => {
   try {
     const rawUrl = String(req.query?.url ?? '').trim();

@@ -1,3 +1,13 @@
+/**
+ * Đồng bộ URL Cloudinary với state khóa học (paths → nodes → materials).
+ *
+ * uploadPendingMaterialsInPaths / uploadPendingMaterialInPath:
+ *   Trước khi gọi API lưu nội dung khóa — upload TEXT (HTML) và DOC (File) chưa có MaterialUrl.
+ *   VIDEO đã upload ngay khi chọn file trong MentorVideoMaterialEditor.
+ *
+ * hydrateTextMaterialsInPaths / hydrateSingleTextMaterial:
+ *   Sau khi load từ API — TEXT chỉ có MaterialUrl → fetch HTML qua backend proxy.
+ */
 import { uploadDocMaterial, uploadTextMaterial, fetchTextMaterialHtml } from '@/features/mentor/services/materialUploadService';
 import {
   DOC_SOURCE_LINK,
@@ -12,6 +22,7 @@ function isBrowserFile(value) {
   return typeof File !== 'undefined' && value instanceof File;
 }
 
+/** Upload một học liệu TEXT/DOC nếu còn nội dung/file local chưa đẩy lên Cloudinary. */
 async function uploadSingleMaterial(material) {
   if (material.MaterialType === 'TEXT') {
     const content = String(material.Content ?? '').trim();
@@ -59,6 +70,7 @@ async function uploadSingleMaterial(material) {
   return material;
 }
 
+/** Nếu Content trống nhưng có MaterialUrl → tải HTML từ Cloudinary (qua /api/materials/text-content). */
 async function hydrateTextMaterial(material) {
   if (material.MaterialType !== 'TEXT') return material;
 

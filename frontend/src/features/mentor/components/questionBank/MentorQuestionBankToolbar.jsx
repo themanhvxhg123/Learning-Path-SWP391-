@@ -11,7 +11,8 @@ import {
   useTheme,
 } from '@mui/material';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
-import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
+import FormatListBulletedRoundedIcon from '@mui/icons-material/FormatListBulletedRounded';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import SortOutlinedIcon from '@mui/icons-material/SortOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
@@ -223,7 +224,7 @@ export default function MentorQuestionBankToolbar({
             iconColor="#047857"
           />
           <FilterTrigger
-            icon={QuizOutlinedIcon}
+            icon={FormatListBulletedRoundedIcon}
             label={questionStatusLabel}
             hasValue={questionStatusFilter !== QB_LIST_DEFAULTS.questionStatus}
             open={Boolean(questionStatusAnchor)}
@@ -233,7 +234,7 @@ export default function MentorQuestionBankToolbar({
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5 }}>
-            <QuizOutlinedIcon sx={{ fontSize: 14, color: '#0891B2' }} />
+            <MenuBookOutlinedIcon sx={{ fontSize: 14, color: '#0891B2' }} />
             <Typography
               variant="caption"
               sx={{ color: MUTED, fontWeight: 500, whiteSpace: 'nowrap', fontSize: 12 }}

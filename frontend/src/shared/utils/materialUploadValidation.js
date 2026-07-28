@@ -1,6 +1,5 @@
-/** Giới hạn upload thực tế (Cloudinary free tier). */
+/** Giới hạn & validate file trước upload (FE) — khớp backend MATERIAL_MAX_BYTES 10MB. */
 export const MATERIAL_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
-
 export const MATERIAL_UPLOAD_MAX_SIZE_MESSAGE = 'Chỉ chấp nhận tối đa 10MB';
 
 export const READING_DOC_EXTENSION_NAMES = ['pdf', 'doc', 'docx'];

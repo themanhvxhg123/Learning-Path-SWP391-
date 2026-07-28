@@ -1,3 +1,27 @@
+/**
+ * =============================================================================
+ * Cloudinary — upload / delivery URL / tải buffer (backend)
+ * =============================================================================
+ *
+ * Thư mục Cloudinary:
+ *   learning-path/materials          — DOC, PDF (image/raw)
+ *   learning-path/materials/text     — HTML học liệu TEXT (raw)
+ *   learning-path/materials/audio    — AUDIO upload qua server (resource_type video)
+ *   learning-path/news               — thumbnail tin tức (image)
+ *
+ * Hàm upload theo loại học liệu:
+ *   uploadTextHtml        → raw .html (UTF-8 buffer)
+ *   uploadDocumentFile    → DOC khóa: PDF as image/pdf; doc/docx as raw
+ *   uploadReadingDocumentFile → bài đọc QB: PDF + q_auto delivery; doc raw
+ *   uploadAudioFile       → video upload + buildDeliveryUrl (mp3/mp4)
+ *
+ * Sau upload: DB/UI lưu url hoặc deliveryUrl trong MaterialUrl.
+ *
+ * Đọc / tải xuống:
+ *   buildDeliveryUrl — chèn /upload/q_auto/ (trừ raw)
+ *   fetchCloudinaryAssetBuffer — thử URL gốc, signed, private (download mentor)
+ *   deleteCloudinaryAssetByUrl — destroy theo public_id parse từ URL
+ */
 const cloudinary = require('../config/cloudinary');
 
 const MATERIALS_FOLDER = 'learning-path/materials';
@@ -29,6 +53,7 @@ const EXTENSION_MIME_ALLOWLIST = {
 
 const MATERIAL_MAX_SIZE_MESSAGE = 'Chỉ chấp nhận tối đa 10MB';
 
+/** Gửi buffer lên Cloudinary qua upload_stream (dùng chung mọi loại file). */
 function uploadBuffer(buffer, options) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
@@ -120,6 +145,7 @@ function assertAllowedReadingDoc(file) {
   assertMimeMatchesExtension(file, ext);
 }
 
+/** DOC học liệu khóa (MaterialType DOC): PDF preview được trong trình duyệt. */
 async function uploadDocumentFile(file) {
   assertAllowedDoc(file);
 
@@ -164,6 +190,7 @@ async function uploadDocumentFile(file) {
   };
 }
 
+/** READING_DOC (ngân hàng câu / bài đọc): PDF có q_auto; Word/PDF raw tương tự DOC. */
 async function uploadReadingDocumentFile(file) {
   assertAllowedReadingDoc(file);
 
@@ -212,6 +239,7 @@ async function uploadReadingDocumentFile(file) {
   };
 }
 
+/** AUDIO qua server (ít dùng hơn direct upload FE); folder audio, resource_type video. */
 async function uploadAudioFile(file) {
   assertMaterialSize(file.size);
   const ext = getExtensionFromFileName(file.originalname);
@@ -280,6 +308,7 @@ async function uploadNewsThumbnailBuffer(buffer, { newsId, ext }) {
   return buildDeliveryUrl(result.secure_url);
 }
 
+/** HTML từ rich text editor — lưu raw trên Cloudinary, URL gán MaterialUrl (Content có thể rỗng khi lưu DB). */
 async function uploadTextHtml(html, title = 'text-material') {
   const trimmed = String(html ?? '').trim();
   if (!trimmed) {
@@ -378,6 +407,10 @@ function buildSignedDownloadUrl(secureUrl, fileName = 'tai-lieu') {
   });
 }
 
+/**
+ * Tải bytes từ Cloudinary (mentor download, proxy file).
+ * Raw: thử URL trực tiếp trước; image/video: ưu tiên private_download_url.
+ */
 async function fetchCloudinaryAssetBuffer(secureUrl, fileName = 'tai-lieu') {
   const raw = String(secureUrl ?? '').trim();
   if (!isCloudinaryDeliveryUrl(raw)) {

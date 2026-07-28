@@ -472,6 +472,11 @@ export async function createCourse(payload) {
  * TODO: replace mock with real API call
  */
 //Get Information of Course by it's id
+/**
+ * Load khóa cho mọi trang edit mentor.
+ * BE: coursesController.getInformationCourse (GET /courses/my-courses/:courseId).
+ * Kèm students để FE khóa category/level/thumbnail khi đã có học viên.
+ */
 export async function fetchMentorCourseDetail(courseId) {
   try {
     const [courseRes, studentsRes] = await Promise.all([
@@ -556,6 +561,7 @@ export async function fetchMentorCourseDetail(courseId) {
  */
 export async function updateCourseBasicInfo(courseId, payload) {
   try {
+    // BE: mentorRoutes PATCH /mentor/courses/:courseId → mentorController.updateCourse
     const response = await fetch(`${API_BASE}/mentor/courses/${courseId}`, {
       method: 'PATCH',
       headers: getMentorAuthHeaders(),
@@ -584,8 +590,10 @@ export async function updateCourseBasicInfo(courseId, payload) {
  */
 export async function updateCourseContent(courseId, paths) {
   try {
+    // 1) Đẩy TEXT/DOC chưa có URL lên Cloudinary
     const uploadedPaths = await uploadPendingMaterialsInPaths(paths);
 
+    // 2) Lấy baseline paths từ DB (cùng API load detail)
     const detailResult = await fetchMentorCourseDetail(courseId);
     if (!detailResult.success) {
       return {
@@ -599,6 +607,7 @@ export async function updateCourseContent(courseId, paths) {
     );
 
     return await saveAllCoursePaths(courseId, uploadedPaths, serverPaths);
+    // ↑ Mỗi path: saveCoursePath → DELETE/POST/PUT /api/mentor/... (xem courseContentService.js)
   } catch (error) {
     console.error('[updateCourseContent]', error);
     return { ok: false, message: error.message ?? 'Lỗi kết nối khi cập nhật nội dung khóa học.' };

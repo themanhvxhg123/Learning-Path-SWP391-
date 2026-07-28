@@ -5,7 +5,6 @@ const { randomizeTestPaperFromConfig } = require('./testPaperRandomService');
 const SKILL_LISTENING = 'LISTENING';
 const SKILL_READING = 'READING';
 const SKILL_VOCABULARY = 'VOCABULARY';
-
 // ============================================================================
 // PHẦN 1: CÁC HÀM TIỆN ÍCH (UTILITIES) ĐỌC CẤU HÌNH TỪ MENTOR
 // ============================================================================
@@ -63,6 +62,7 @@ async function loadSectionsForPaths(courseId, pathIds = []) {
   return allSections;
 }
 
+
 // ============================================================================
 // PHẦN 3: CÁC HÀM KIỂM TRA ĐIỀU KIỆN (VALIDATION)
 // ============================================================================
@@ -82,6 +82,7 @@ function hasMentorQuestionConfigs(config = {}) {
   return Array.isArray(config.questionConfigs);
 }
 
+
 /**
  * @summary Chốt chặn an toàn: Bắn ra LỖI NGAY LẬP TỨC nếu Đề thi bị rỗng.
  * @description Ngăn chặn việc tạo ra một bài test không có câu hỏi nào (Tránh bug sập Web).
@@ -93,6 +94,7 @@ function assertConfigHasQuizSources(config, scopeLabel = 'bài kiểm tra') {
     throw error;
   }
 }
+
 
 // ============================================================================
 // PHẦN 4: CHỨC NĂNG CỐT LÕI - GỌI THUẬT TOÁN RANDOM ĐỂ BUILD ĐỀ
@@ -107,6 +109,7 @@ async function buildPaperFromConfig(config, sectionsData, options = {}) {
     loadQuestionsForSection: (sectionId) => questionBankModel.getQuestionsBySection(sectionId),
   });
 }
+
 
 /**
  * @summary Build Đề Thi Chương (Chapter Test).
@@ -128,10 +131,12 @@ async function buildCourseTestPaper(config, courseId) {
   });
 }
 
+
 /** 
  * @summary Load section ngân hàng câu hỏi cho bài test toàn khóa. 
  * @description Chỉ load câu hỏi từ những Chương mà Mentor đã tick chọn trước đó.
  */
+/** Load section ngân hàng câu hỏi cho bài test toàn khóa. */
 async function loadCourseTestSections(courseId, config) {
   const selectedChapterIds = (config?.selectedChapterIds ?? [])
     .map(String)
@@ -146,6 +151,7 @@ async function loadCourseTestSections(courseId, config) {
   return loadSectionsForPaths(courseId, selectedChapterIds);
 }
 
+/** Random đề khi đã có sẵn config + sectionsData (sau bước đề xuất). */
 /** 
  * @summary Build Đề Thi Gợi Ý (Dành cho học viên Thi Lại).
  * @description Random đề khi đã có sẵn config bị bóp méo (sau bước phân tích điểm yếu). 

@@ -128,6 +128,7 @@ const setDraftCourse = async (req, res) => {
 };
 
 const updateCourse = async (req, res) => {
+    // FE: MentorEditCourseReviewPage → updateCourseBasicInfo → PATCH /api/mentor/courses/:courseId
     try {
         const courseId = Number(req.params.courseId);
         const instructorId = req.user?.userId ?? req.body?.InstructorId ?? null;

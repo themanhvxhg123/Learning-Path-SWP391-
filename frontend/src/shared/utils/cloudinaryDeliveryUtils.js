@@ -21,7 +21,7 @@ export {
   getMaterialMaxFileSizeLabel,
 } from '@/shared/utils/materialUploadValidation';
 
-/** Chèn delivery transformation vào URL Cloudinary (q_auto). */
+/** Đồng bộ với backend buildDeliveryUrl — chèn q_auto cho video/image (bỏ qua /raw/upload/). */
 export function getCloudinaryDeliveryUrl(secureUrl, transformation = 'q_auto') {
   const url = String(secureUrl ?? '').trim();
   if (!url.includes('cloudinary.com') || !url.includes('/upload/')) {

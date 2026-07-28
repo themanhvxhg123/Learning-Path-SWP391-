@@ -1,3 +1,6 @@
+/**
+ * Validate question bank — trùng đề/đáp án: checkDuplicateQuestions([{ id, title, choices }]).
+ */
 // TODO: backend should support TEST material details: Sections, SkillType, Questions, Options, Pairs, Answers
 
 import {
@@ -1000,63 +1003,151 @@ export function normalizeQuestionBankSectionForSave(section) {
   return next;
 }
 
-function normalizeQuestionBankCompareKey(value) {
-  return String(value ?? '').trim().toLocaleLowerCase('vi-VN');
+/** Chuỗi so sánh khi check trùng (đề câu, đáp án, tên section): trim + lower tiếng Việt. */
+function qbTextKey(text) {
+  return String(text ?? '').trim().toLocaleLowerCase('vi-VN');
 }
 
-function resolveQuestionBankSectionTitleForCompare(section) {
-  const trimmedTitle = String(section?.SectionTitle ?? '').trim();
-  if (trimmedTitle) return trimmedTitle;
+/** Title đề section để so với section khác trong chương (Vocab dùng DisplayName nếu không có SectionTitle). */
+function qbSectionTitleKey(section) {
+  const fromTitle = String(section?.SectionTitle ?? '').trim();
+  if (fromTitle) return qbTextKey(fromTitle);
   if (section?.SkillType === TEST_SKILL_VOCABULARY) {
-    return String(section?.DisplayName ?? '').trim();
+    return qbTextKey(section?.DisplayName);
   }
   return '';
 }
 
-function validateQuestionBankSectionNameUniqueness(section, allSections = []) {
-  const errors = {};
-  const sectionNameKey = normalizeQuestionBankCompareKey(section?.DisplayName);
-  const sectionTitleKey = normalizeQuestionBankCompareKey(
-    resolveQuestionBankSectionTitleForCompare(section),
-  );
+/**
+ * Kiểm tra trùng đề câu hỏi và trùng lựa chọn trong danh sách câu.
+ *
+ * @param {{ id: string, title: string, choices?: string[] }[]} questions
+ * @returns {{ questionId: string, questionNumber: number, kind: 'title'|'choice', message: string }[]}
+ *
+ * - Trùng title: so sánh title đã chuẩn hóa (trim + lower vi-VN) giữa các câu trong list.
+ * - Trùng choice: trong cùng một câu, hai lựa chọn có nội dung chuẩn hóa giống nhau.
+ * - Đề/đáp án rỗng sau chuẩn hóa không tham gia so trùng.
+ */
+export function checkDuplicateQuestions(questions = []) {
+  const normalized = (questions ?? []).map((item, index) => ({
+    id: String(item?.id ?? index),
+    questionNumber: index + 1,
+    title: String(item?.title ?? ''),
+    choices: (item?.choices ?? []).map((choice) => String(choice ?? '')),
+  }));
 
-  (allSections ?? []).forEach((other) => {
-    if (!other?.tempId || other.tempId === section?.tempId) return;
+  const errors = [];
 
-    const otherNameKey = normalizeQuestionBankCompareKey(other.DisplayName);
-    const otherTitleKey = normalizeQuestionBankCompareKey(
-      resolveQuestionBankSectionTitleForCompare(other),
-    );
+  const titleBuckets = new Map();
+  for (const question of normalized) {
+    const key = qbTextKey(question.title);
+    if (!key) continue;
+    if (!titleBuckets.has(key)) titleBuckets.set(key, []);
+    titleBuckets.get(key).push(question);
+  }
 
-    if (sectionNameKey && otherNameKey && sectionNameKey === otherNameKey) {
-      errors.DisplayName = 'Section name đã tồn tại trong chương này';
+  for (const group of titleBuckets.values()) {
+    if (group.length < 2) continue;
+    for (const question of group) {
+      const otherNumbers = group
+        .filter((item) => item.id !== question.id)
+        .map((item) => item.questionNumber);
+      if (otherNumbers.length === 0) continue;
+      errors.push({
+        questionId: question.id,
+        questionNumber: question.questionNumber,
+        kind: 'title',
+        message: `Câu ${question.questionNumber} trùng đề với câu ${otherNumbers.join(', ')}`,
+      });
     }
-    if (sectionTitleKey && otherTitleKey && sectionTitleKey === otherTitleKey) {
-      errors.SectionTitle = 'Title (đề bài) đã tồn tại trong chương này';
+  }
+
+  for (const question of normalized) {
+    const choiceBuckets = new Map();
+    question.choices.forEach((text, choiceIndex) => {
+      const key = qbTextKey(text);
+      if (!key) return;
+      if (!choiceBuckets.has(key)) choiceBuckets.set(key, []);
+      choiceBuckets.get(key).push(choiceIndex);
+    });
+
+    for (const indexes of choiceBuckets.values()) {
+      if (indexes.length < 2) continue;
+      const choiceNums = indexes.map((i) => i + 1);
+      errors.push({
+        questionId: question.id,
+        questionNumber: question.questionNumber,
+        kind: 'choice',
+        choiceIndexes: indexes,
+        message: `Câu ${question.questionNumber}: lựa chọn ${choiceNums.join(', ')} trùng nhau`,
+      });
     }
-  });
+  }
 
   return errors;
 }
 
-function findQuestionBankDuplicateQuestionGroups(section) {
-  const titleGroups = new Map();
+/** Map câu hỏi section (QuestionText, Options) → input của checkDuplicateQuestions. */
+export function toDuplicateCheckQuestions(sectionQuestions = []) {
+  return (sectionQuestions ?? []).map((question, index) => ({
+    id: String(question?.tempId ?? question?.QuestionId ?? index),
+    title: String(question?.QuestionText ?? ''),
+    choices: (question?.Options ?? []).map((option) => String(option?.OptionText ?? '')),
+  }));
+}
 
-  (section?.Questions ?? []).forEach((question, index) => {
-    const titleKey = normalizeQuestionBankCompareKey(question?.QuestionText);
-    if (!titleKey) return;
+/** Gắn kết quả checkDuplicateQuestions lên shape lỗi form (QuestionText / Options). */
+function mapDuplicateErrorsToQuestionFields(duplicateErrors, sectionQuestions = []) {
+  const questionById = new Map(
+    (sectionQuestions ?? []).map((question) => [String(question.tempId), question]),
+  );
+  const questionErrors = {};
 
-    if (!titleGroups.has(titleKey)) {
-      titleGroups.set(titleKey, []);
+  for (const entry of duplicateErrors) {
+    if (entry.kind === 'title') {
+      questionErrors[entry.questionId] = {
+        ...(questionErrors[entry.questionId] ?? {}),
+        QuestionText: entry.message,
+      };
+      continue;
     }
-    titleGroups.get(titleKey).push({
-      question,
-      index: index + 1,
-      text: String(question?.QuestionText ?? '').trim(),
-    });
-  });
 
-  return [...titleGroups.values()].filter((items) => items.length > 1);
+    if (entry.kind === 'choice') {
+      const source = questionById.get(entry.questionId);
+      const options = source?.Options ?? [];
+      const optionErrors = { ...(questionErrors[entry.questionId]?.Options ?? {}) };
+      (entry.choiceIndexes ?? []).forEach((choiceIndex) => {
+        const option = options[choiceIndex];
+        if (!option?.tempId) return;
+        optionErrors[option.tempId] = { OptionText: QUESTION_BANK_DUPLICATE_OPTION_ERROR };
+      });
+      questionErrors[entry.questionId] = {
+        ...(questionErrors[entry.questionId] ?? {}),
+        Options: optionErrors,
+      };
+    }
+  }
+
+  return questionErrors;
+}
+
+/** Lỗi trùng DisplayName hoặc title section với section khác trong chương. */
+function collectDuplicateSectionNameErrors(section, allSections) {
+  const errors = {};
+  const myName = qbTextKey(section?.DisplayName);
+  const myTitle = qbSectionTitleKey(section);
+
+  for (const other of allSections ?? []) {
+    if (!other?.tempId || other.tempId === section?.tempId) continue;
+    if (myName && myName === qbTextKey(other.DisplayName)) {
+      errors.DisplayName = 'Section name đã tồn tại trong chương này';
+    }
+    if (myTitle && myTitle === qbSectionTitleKey(other)) {
+      errors.SectionTitle = 'Title (đề bài) đã tồn tại trong chương này';
+    }
+  }
+
+  return errors;
 }
 
 function formatQuestionBankMissingAnswersToast(section, errors = {}) {
@@ -1099,17 +1190,12 @@ function formatQuestionBankDuplicateOptionsToast(section, errors = {}) {
 }
 
 function formatQuestionBankDuplicateQuestionsToast(section) {
-  const groups = findQuestionBankDuplicateQuestionGroups(section);
-  if (groups.length === 0) return null;
-
-  const parts = groups.map((items) => {
-    const nums = items.map((item) => item.index).join(', ');
-    const preview = items[0].text;
-    const shortPreview = preview.length > 60 ? `${preview.slice(0, 57)}...` : preview;
-    return `Câu ${nums}: "${shortPreview}"`;
-  });
-
-  return `Câu hỏi trùng đề bài — ${parts.join(' · ')}`;
+  const duplicateErrors = checkDuplicateQuestions(toDuplicateCheckQuestions(section?.Questions));
+  const titleMessages = duplicateErrors
+    .filter((entry) => entry.kind === 'title')
+    .map((entry) => entry.message);
+  if (titleMessages.length === 0) return null;
+  return `Câu hỏi trùng đề bài — ${titleMessages.join(' · ')}`;
 }
 
 function formatQuestionBankMissingCorrectToast(section, errors = {}) {
@@ -1131,33 +1217,11 @@ function collectQuestionBankQuestionTextToasts(section, errors = {}) {
 
   (section?.Questions ?? []).forEach((question) => {
     const qErrors = errors?.Questions?.[question.tempId];
-    if (!qErrors?.QuestionText || String(qErrors.QuestionText).includes('bị trùng')) return;
+    if (!qErrors?.QuestionText || /trùng đề|bị trùng/i.test(String(qErrors.QuestionText))) return;
     messages.push(qErrors.QuestionText);
   });
 
   return messages;
-}
-
-function validateQuestionBankQuestionTitleUniqueness(section) {
-  const questionErrors = {};
-
-  findQuestionBankDuplicateQuestionGroups(section).forEach((items) => {
-    items.forEach(({ question, index }) => {
-      const duplicateIndexes = items
-        .filter((item) => item.question.tempId !== question.tempId)
-        .map((item) => item.index);
-      const suffix = duplicateIndexes.length > 0
-        ? ` (trùng với câu ${duplicateIndexes.join(', ')})`
-        : '';
-
-      questionErrors[question.tempId] = {
-        ...(questionErrors[question.tempId] ?? {}),
-        QuestionText: `Đề bài câu hỏi bị trùng${suffix}`,
-      };
-    });
-  });
-
-  return questionErrors;
 }
 
 export function getSectionDisplayTitle(section) {
@@ -1240,22 +1304,6 @@ export function validateTestQuestion(question, { validateScore = true } = {}) {
         OptionText: `Tối đa ${TEST_QUESTION_OPTION_TEXT_MAX} ký tự`,
       };
     }
-  });
-
-  const optionTextGroups = new Map();
-  options.forEach((option) => {
-    const key = normalizeQuestionBankCompareKey(option?.OptionText);
-    if (!key) return;
-    if (!optionTextGroups.has(key)) optionTextGroups.set(key, []);
-    optionTextGroups.get(key).push(option);
-  });
-  // Trong 1 câu hỏi: không cho 2 lựa chọn (choice) giống nhau.
-  optionTextGroups.forEach((group) => {
-    if (group.length < 2) return;
-    group.forEach((option) => {
-      if (optionErrors[option.tempId]?.OptionText) return;
-      optionErrors[option.tempId] = { OptionText: QUESTION_BANK_DUPLICATE_OPTION_ERROR };
-    });
   });
 
   if (Object.keys(optionErrors).length > 0) {
@@ -1382,7 +1430,7 @@ export function validateTestMaterial(material, options = {}) {
   return materialErrors;
 }
 
-/** Validate một section question bank (dùng trước khi cập nhật từng section). */
+/** Validate một section question bank (dùng trước khi cập nhật từng section). Mục lục: đầu file + docs/QUESTION_BANK_VALIDATION_DEFENSE.md */
 export function validateQuestionBankSection(
   section,
   { validateScore = false, requireQuestions = false, forSave = false, allSections = [] } = {},
@@ -1411,7 +1459,7 @@ export function validateQuestionBankSection(
       sErrors.SectionTitle = 'Vui lòng nhập Title (đề bài)';
     }
 
-    Object.assign(sErrors, validateQuestionBankSectionNameUniqueness(section, allSections));
+    Object.assign(sErrors, collectDuplicateSectionNameErrors(section, allSections));
   }
 
   const questions = section.Questions ?? [];
@@ -1441,7 +1489,8 @@ export function validateQuestionBankSection(
   });
 
   if (forSave) {
-    const duplicateQuestionErrors = validateQuestionBankQuestionTitleUniqueness(section);
+    const duplicateList = checkDuplicateQuestions(toDuplicateCheckQuestions(questions));
+    const duplicateQuestionErrors = mapDuplicateErrorsToQuestionFields(duplicateList, questions);
     Object.entries(duplicateQuestionErrors).forEach(([tempId, qErrors]) => {
       questionErrors[tempId] = {
         ...(questionErrors[tempId] ?? {}),
