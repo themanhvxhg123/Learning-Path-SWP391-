@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Box, Breadcrumbs, Link as MuiLink, Typography, alpha } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import AppButton from '@/shared/ui/AppButton';
@@ -180,7 +180,7 @@ export default function MentorQuestionBankListPage() {
         >
           <EmptyState
             embedded
-            icon={MenuBookOutlinedIcon}
+            icon={QuizOutlinedIcon}
             title={
               listQuestionBank.length > 0
                 ? 'Không tìm thấy khóa học phù hợp'

@@ -15,10 +15,11 @@ import {
   alpha,
   useTheme,
 } from '@mui/material';
+import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import RouteOutlinedIcon from '@mui/icons-material/RouteOutlined';
-import FormatListNumberedRoundedIcon from '@mui/icons-material/FormatListNumberedRounded';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import { useNavigate } from 'react-router-dom';
 import AppButton from '@/shared/ui/AppButton';
@@ -36,6 +37,7 @@ const METRIC_COLORS = {
   published: '#047857',
   draft: '#64748B',
   chapters: '#7C3AED',
+  quiz: '#2563EB',
   updated: '#7C3AED',
 };
 const PILL_CHIP_SX = {
@@ -150,14 +152,14 @@ export default function MentorQuestionBankRow({ bankItem }) {
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
           <MetricItem
-            icon={FormatListNumberedRoundedIcon}
+            icon={QuizOutlinedIcon}
             label="Tổng câu hỏi: "
             value={bankItem.TotalQuestion ?? 0}
             iconColor={METRIC_COLORS.total}
           />
           <MetricItem
             icon={CheckCircleOutlineRoundedIcon}
-            label="Đã công bố: "
+            label="Dùng trong test: "
             value={bankItem.TotalQuestionIsPublic ?? 0}
             iconColor={METRIC_COLORS.published}
           />
@@ -175,6 +177,13 @@ export default function MentorQuestionBankRow({ bankItem }) {
             label="Chương có câu hỏi"
             value={`${bankItem.PathHasQuestion ?? 0}/${bankItem.TotalPath ?? 0}`}
             iconColor={METRIC_COLORS.chapters}
+          />
+          <MetricItem
+            icon={AssignmentOutlinedIcon}
+            label="Quiz/Test"
+            //___quizCount is Null, can only fix by sql query____________________________________________________________
+            value={bankItem.quizCount ?? 0}
+            iconColor={METRIC_COLORS.quiz}
           />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
             <CalendarTodayOutlinedIcon
