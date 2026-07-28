@@ -1,7 +1,7 @@
 const { sql } = require('../config/db');
 
 // Hàm tạo một lượt làm bài mới
-const createTestAttempt = async (userId, testId, remainingSeconds) => {
+const  createTestAttempt = async (userId, testId, remainingSeconds) => {
     const request = new sql.Request();
     request.input('userId', sql.Int, userId);
     request.input('testId', sql.Int, testId);
