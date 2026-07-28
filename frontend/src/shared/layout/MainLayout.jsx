@@ -24,9 +24,9 @@ export default function MainLayout({ children }) {
   const location = useLocation();
   const hideFooter = /\/my-courses\/[^/]+\/(learn|test)(\/|$)/.test(location.pathname);
 
-  // Mentor không dùng shell học viên. Admin vào /courses qua MainLayout; profile dùng /admin/profile.
+  // Mentor không dùng shell học viên -> chuyển về trang 403.
   if (shouldBlockStudentShell(user)) {
-    return <Navigate to={getRoleDefaultPath(user)} replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return (

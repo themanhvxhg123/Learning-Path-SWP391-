@@ -23,6 +23,7 @@ export default function AdminLayout() {
           logoTo="/admin/accounts"
           showMyCoursesButton={false}
           hideProfileMenuItem
+          showChangePassword
         />
         <Sidebar variant="admin" />
 

@@ -400,7 +400,7 @@ function HeroSection({ onExplore, onViewNews }) {
  */
 function ContinueSection({ course, onContinue, onExplore }) {
   const theme = useTheme();
-
+// chưa học bao giờ (new user)
   if (!course) {
     return (
       <Box sx={{ mb: { xs: 7, md: 9 } }}>
@@ -465,7 +465,7 @@ function ContinueSection({ course, onContinue, onExplore }) {
       </Box>
     );
   }
-
+ //trh còn khoá học (phổ biến nhất)
   const progress = Math.min(Math.max(course.progressPercentage ?? 0, 0), 100);
   const progressColor = getProgressColor(progress);
 
@@ -632,43 +632,14 @@ function ContinueSection({ course, onContinue, onExplore }) {
   );
 }
 
-/* ─── Section 3: Tin tức (lộ trình + bài viết) ───────────── */
+/* ─── Section 3: Tin tức ──────────────────────────────────── */
 
 /**
- * Khối tin tức nổi bật và lộ trình gợi ý, tải tự động từ API và hiển thị dưới dạng các thẻ Card bài viết.
+ * Khối tin tức nổi bật, tải tự động từ API và hiển thị dưới dạng các thẻ Card bài viết.
  */
 function NewsSection() {
   const navigate = useNavigate();
-  const [paths, setPaths] = useState([]);
   const [articles, setArticles] = useState([]);
-
-  useEffect(() => {
-    const fetchFeaturedPaths = async () => {
-      try {
-        const res = await fetch(
-          "http://localhost:5000/api/courses/featured-paths",
-        );
-        const data = await res.json();
-        setPaths(
-          data.data.map((p) => ({
-            id: `path-${p.PathId}`,
-            type: "path",
-            title: p.PathName,
-            excerpt: p.Description ?? "",
-            category: "Lộ trình",
-            date: null,
-            thumbnail: p.thumbnail || p.Thumbnail || null,
-            accent: "#0891B2",
-            nodeCount: p.TotalNodes ?? 0,
-          })),
-        );
-      } catch (error) {
-        console.error("Error fetching featured paths:", error);
-      }
-    };
-
-    fetchFeaturedPaths();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -683,9 +654,8 @@ function NewsSection() {
   }, []);
 
   const items = useMemo(
-    () => [
-      ...paths,
-      ...articles.map((article) => ({
+    () =>
+      articles.map((article) => ({
         id: `article-${article.id}`,
         articleId: article.id,
         type: "article",
@@ -695,8 +665,7 @@ function NewsSection() {
         date: formatNewsDate(article.publishedAt || article.updatedAt),
         thumbnail: article.thumbnail,
       })),
-    ],
-    [paths, articles],
+    [articles],
   );
 
   return (
@@ -717,155 +686,116 @@ function NewsSection() {
           gap: 2.5,
         }}
       >
-        {items.map((item) => {
-          const isArticle = item.type === "article";
-          const CardRoot = isArticle ? Link : Box;
-          const cardRootProps = isArticle
-            ? { to: `/news/${item.articleId}` }
-            : {};
-
-          return (
-            <CardRoot
-              key={item.id}
-              {...cardRootProps}
+        {items.map((item) => (
+          <Link
+            key={item.id}
+            to={`/news/${item.articleId}`}
+            sx={{
+              display: "block",
+              textDecoration: "none",
+              color: "inherit",
+              borderRadius: "18px",
+              border: `1px solid ${BORDER}`,
+              bgcolor: "#fff",
+              overflow: "hidden",
+              cursor: "pointer",
+              transition: "transform 0.22s ease, box-shadow 0.22s ease",
+              "&:hover": {
+                transform: "translateY(-3px)",
+                boxShadow: "0 12px 32px rgba(8,145,178,0.09)",
+              },
+            }}
+          >
+            <Box
               sx={{
-                display: "block",
-                textDecoration: "none",
-                color: "inherit",
-                borderRadius: "18px",
-                border: `1px solid ${BORDER}`,
-                bgcolor: "#fff",
+                height: 180,
                 overflow: "hidden",
-                cursor: isArticle ? "pointer" : "default",
-                transition: "transform 0.22s ease, box-shadow 0.22s ease",
-                "&:hover": {
-                  transform: "translateY(-3px)",
-                  boxShadow: "0 12px 32px rgba(8,145,178,0.09)",
-                },
+                position: "relative",
+                bgcolor: alpha(PRIMARY, 0.05),
               }}
             >
+              <ThumbnailImage
+                src={item.thumbnail}
+                label={item.title}
+                alt={item.title}
+                icon={MenuBookOutlinedIcon}
+                iconSize={36}
+                sx={{ height: 180, width: "100%" }}
+                imgSx={{
+                  transition: "transform 0.4s ease",
+                  ".MuiBox-root:hover &": { transform: "scale(1.04)" },
+                }}
+              />
+            </Box>
+
+            <Box sx={{ p: 2.25 }}>
               <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.25, flexWrap: "wrap" }}
+              >
+                <CategoryChip category={item.category} />
+                {item.date && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: MUTED }} />
+                    <Typography sx={{ fontSize: 11, color: MUTED }}>{item.date}</Typography>
+                  </Box>
+                )}
+              </Box>
+
+              <Typography
                 sx={{
-                  height: 180,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: TEXT,
+                  lineHeight: 1.35,
+                  mb: 0.875,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
                   overflow: "hidden",
-                  position: "relative",
-                  bgcolor: alpha(PRIMARY, 0.05),
                 }}
               >
-                <ThumbnailImage
-                  src={item.thumbnail}
-                  label={item.title}
-                  alt={item.title}
-                  icon={item.type === "path" ? RouteOutlinedIcon : MenuBookOutlinedIcon}
-                  iconSize={36}
-                  sx={{ height: 180, width: "100%" }}
-                  imgSx={{
-                    transition: "transform 0.4s ease",
-                    ".MuiBox-root:hover &": { transform: "scale(1.04)" },
-                  }}
-                />
-                {item.type === "path" && item.thumbnail && (
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      inset: 0,
-                      background: `linear-gradient(135deg, ${alpha(item.accent ?? PRIMARY, 0.35)} 0%, transparent 60%)`,
-                    }}
-                  />
-                )}
+                {item.title}
+              </Typography>
+
+              <Typography
+                sx={{
+                  fontSize: 13,
+                  color: MUTED,
+                  lineHeight: 1.6,
+                  mb: 2,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {item.excerpt}
+              </Typography>
+
+              <Box
+                component="span"
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: PRIMARY,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.4,
+                  opacity: 0.7,
+                }}
+              >
+                Đọc thêm <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
               </Box>
-
-              <Box sx={{ p: 2.25 }}>
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.25, flexWrap: "wrap" }}
-                >
-                  <CategoryChip category={item.category} />
-                  {item.type === "article" && item.date && (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: MUTED }} />
-                      <Typography sx={{ fontSize: 11, color: MUTED }}>{item.date}</Typography>
-                    </Box>
-                  )}
-                  {item.type === "path" && (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <RouteOutlinedIcon sx={{ fontSize: 12, color: item.accent ?? PRIMARY }} />
-                      <Typography sx={{ fontSize: 11, color: MUTED, fontWeight: 500 }}>
-                        {item.nodeCount} chương
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: TEXT,
-                    lineHeight: 1.35,
-                    mb: 0.875,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                >
-                  {item.title}
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    color: MUTED,
-                    lineHeight: 1.6,
-                    mb: 2,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                >
-                  {item.excerpt}
-                </Typography>
-
-                {item.type === "article" ? (
-                  <Box
-                    component="span"
-                    sx={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: PRIMARY,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 0.4,
-                      opacity: 0.7,
-                    }}
-                  >
-                    Đọc thêm <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
-                  </Box>
-                ) : (
-                  <Box
-                    component="span"
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: MUTED,
-                      opacity: 0.65,
-                    }}
-                  >
-                    Sắp ra mắt
-                  </Box>
-                )}
-              </Box>
-            </CardRoot>
-          );
-        })}
+            </Box>
+          </Link>
+        ))}
       </Box>
     </Box>
   );
 }
 
 /* ─── Section 4: Suggested courses ──────────────────────── */
-
+//Hiển thị khoá học
 function CourseGrid({ courses, onNavigateCourse }) {
   return (
     <Box sx={COURSE_GRID_SX}>
@@ -879,7 +809,7 @@ function CourseGrid({ courses, onNavigateCourse }) {
     </Box>
   );
 }
-
+//khung báo
 function ForYouPlaceholder({ isLoggedIn, learningGoal, hasCategories, onExplore, onLogin }) {
   return (
     <Box
@@ -1497,6 +1427,7 @@ export default function HomePage() {
       try {
         const params = new URLSearchParams();
         userCategories.forEach((c) => params.append("category", String(c.categoryId)));
+        // chỉ hiện chưa đăng kí 
         params.append("status", "not_enrolled");
 
         const coursesRes = await fetch(

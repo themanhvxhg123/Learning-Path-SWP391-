@@ -11,17 +11,18 @@ export function getProgressColor(progress) {
   if (value >= 100) return "#16A34A";
 
   if (value < 25) {
+    //đỏ
     return `hsl(4, 78%, ${58 - value * 0.25}%)`;
   }
-
+    //cam
   if (value < 50) {
     return `hsl(24, 88%, ${56 - (value - 25) * 0.2}%)`;
   }
-
+  //vàng
   if (value < 75) {
     return `hsl(38, 88%, ${52 - (value - 50) * 0.12}%)`;
   }
-
+  //Xanh 
   return `hsl(190, 92%, ${36 + (value - 75) * 0.08}%)`;
 }
 
@@ -35,6 +36,7 @@ export function getProgressColor(progress) {
  *   label      — custom left-side label (implies header row)
  *   sx         — applied to outer Box wrapper
  */
+// thanh tiến độ
 export default function AppProgressBar({
   value = 0,
   height = 6,

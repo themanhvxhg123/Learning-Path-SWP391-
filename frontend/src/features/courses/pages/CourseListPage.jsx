@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Box, Breadcrumbs, Grid, Link as MuiLink, Typography, alpha, useTheme } from "@mui/material";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Loading from "@/shared/ui/Loading";
 import EmptyState from "@/shared/ui/EmptyState";
 import CourseCard from "@/features/courses/components/CourseCard";
@@ -10,13 +10,11 @@ import CourseListPagination, { COURSE_LIST_PAGE_SIZE } from "@/features/courses/
 import { toast } from "@/shared/ui/Toast";
 import {
   buildActiveFilterChips,
-  buildCourseDetailPath,
   buildCourseListSearchParams,
   hasActiveCourseFilters,
   parseCourseListParams,
   resetCourseListParams,
 } from "@/features/courses/utils/courseListParams";
-import { enrollCourseApi } from '@/features/auth/services/authService';
 
 const PAGE_SIZE = COURSE_LIST_PAGE_SIZE;
 
@@ -63,7 +61,6 @@ async function fetchCourses(userId, filters) {
 export default function CourseListPage() {
   const theme = useTheme();
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // State lưu trữ danh sách khóa học và phân trang
@@ -85,6 +82,7 @@ export default function CourseListPage() {
   };
 
   useEffect(() => {
+    //danh sách cate danh sách level
     async function fetchLookups() {
       try {
         const [catRes, levRes] = await Promise.all([
@@ -113,7 +111,7 @@ export default function CourseListPage() {
     fetchLookups();
   }, []);
 
-  // Tải danh sách khóa học dựa theo bộ lọc thay đổi
+  // Tải danh sách khóa học dựa theo bộ lọc thay đổi (hoặc không)
   useEffect(() => {
     let isMounted = true;
 
@@ -153,16 +151,16 @@ export default function CourseListPage() {
   }, [filters.page, currentPage]);
 
   // Bắt sự kiện tương tác bộ lọc thanh công cụ công khai
-  const handleCategoriesChange = (e) => updateFilters({ categories: e.target.value, page: 1 });
-  const handleLevelsChange = (e) => updateFilters({ levels: e.target.value, page: 1 });
-  const handleStatusesChange = (e) => updateFilters({ statuses: e.target.value, page: 1 });
-  const handleSortChange = (e) => updateFilters({ sort: e.target.value, page: 1 });
+  const handleCategoriesChange = (e) => updateFilters({categories: e.target.value, page: 1});
+  const handleLevelsChange = (e) => updateFilters({levels: e.target.value, page: 1});
+  const handleStatusesChange = (e) => updateFilters({statuses: e.target.value, page: 1});
+  const handleSortChange = (e) => updateFilters({sort: e.target.value, page: 1});
   const handlePageChange = (val) => {
     updateFilters({ page: val });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-
+  // Hàm xử lý khi người dùng bấm vào nút "Tiếp tục học"
   const handleContinueLearning = (course) => {
     const cId = course.CourseId || course.courseId || course.id;
     navigate(`/my-courses/${cId}/learn`);
@@ -185,7 +183,7 @@ export default function CourseListPage() {
       updateFilters({ statuses: [], page: 1 });
     }
   };
-
+//Làm nhiệm vụ "Xóa sạch bộ lọc" 
   const handleResetFilters = () => setSearchParams(resetCourseListParams(searchParams), { replace: true });
 
   return (

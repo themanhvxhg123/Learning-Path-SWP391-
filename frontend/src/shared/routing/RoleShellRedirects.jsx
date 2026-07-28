@@ -53,23 +53,23 @@ export function MentorShellFallbackRedirect() {
 
 /**
  * Lớp bảo vệ bảo mật (Guard) cho giao diện Admin.
- * Nếu phát hiện Mentor hoặc Student cố tình vào link Admin, tự động chuyển họ về đúng trang mặc định của họ.
+ * Nếu phát hiện Mentor hoặc Student cố tình vào link Admin, chuyển về trang 403.
  */
 export function AdminLayoutGuard({ children }) {
   const user = getUser();
-  if (isMentor(user)) return <Navigate to={getRoleDefaultPath(user)} replace />;
-  if (isStudent(user)) return <Navigate to={getRoleDefaultPath(user)} replace />;
+  if (isMentor(user)) return <Navigate to="/unauthorized" replace />;
+  if (isStudent(user)) return <Navigate to="/unauthorized" replace />;
   return children;
 }
 
 /**
  * Lớp bảo vệ bảo mật (Guard) cho giao diện Mentor.
- * Nếu phát hiện Admin hoặc Student cố tình vào link Mentor, tự động chuyển họ về đúng trang mặc định của họ.
+ * Nếu phát hiện Admin hoặc Student cố tình vào link Mentor, chuyển về trang 403.
  */
 export function MentorLayoutGuard({ children }) {
   const user = getUser();
-  if (isAdmin(user)) return <Navigate to={getRoleDefaultPath(user)} replace />;
-  if (isStudent(user)) return <Navigate to={getRoleDefaultPath(user)} replace />;
+  if (isAdmin(user)) return <Navigate to="/unauthorized" replace />;
+  if (isStudent(user)) return <Navigate to="/unauthorized" replace />;
   return children;
 }
 

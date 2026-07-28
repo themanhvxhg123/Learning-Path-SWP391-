@@ -3,7 +3,7 @@ const courseModel = require('../models/coursesModel');
 const streakService = require("../services/streakService");
 const courseCommentsModel = require('../models/courseCommentsModel');
 const { validateCourseThumbnailDataUrl } = require('../middlewares/courseThumbnailMiddleware');
-
+// khoá học tổng 
 const getStudentCourses = async (req, res) => {
   try {
     const filters = {
@@ -33,7 +33,7 @@ const getStudentCourses = async (req, res) => {
     });
   }
 };
-
+// khoá học của tôi
 const getMyCourses = async (req, res) => {
   try {
     const { userId, roleName } = req.body;
@@ -69,7 +69,7 @@ const getMyCourses = async (req, res) => {
   }
 };
 
-//Get course's by Id
+//lấy thông tin của course 
 const getInformationCourse = async (req, res) => {
   try {
     const courseId = req.params.courseId;
@@ -144,7 +144,7 @@ const getInformationCourse = async (req, res) => {
     });
   }
 };
-
+//danh sách Chương/Bài (mục lục) ra để hiển thị lên một cái Menu CỦA MENTOR
 const getCourseChapters = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -302,7 +302,7 @@ const getLearningPath = async (req, res) => {
   }
 };
 
-// Hứng request lưu bài học
+// Hứng request Lưu bài học (Hoàn thành bài học)
 const updateProgress = async (req, res) => {
   try {
     const courseId = req.params.id;
@@ -315,7 +315,7 @@ const updateProgress = async (req, res) => {
     res.status(500).json({ success: false, message: "Lỗi Server" });
   }
 };
-
+//STREAK
 async function getStreak(req, res) {
   const userId = Number(req.headers["x-user-id"]);
   if (!userId) return res.json({ success: true, streak: 0, hasStudiedToday: false });
@@ -327,7 +327,7 @@ async function getStreak(req, res) {
     res.json({ success: true, streak: 0, hasStudiedToday: false });
   }
 }
-
+//danh sách comment của course (trang detail)
 const getCourseComments = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -350,7 +350,7 @@ const getCourseComments = async (req, res) => {
     });
   }
 };
-
+// viết comment
 const createCourseComment = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -407,6 +407,12 @@ const createCourseComment = async (req, res) => {
     });
   } catch (error) {
     console.error('createCourseComment error:', error.message);
+    
+    // Nếu lỗi là do chạm trần giới hạn (EditCount >= 1) được ném ra từ Model
+    if (error.message === 'Bạn chỉ được sửa đánh giá 1 lần duy nhất!') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    
     return res.status(500).json({ success: false, message: 'Lỗi server khi gửi bình luận' });
   }
 };
@@ -477,6 +483,7 @@ const enrollCourse = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Lỗi server khi đăng ký khóa học' });
   }
 };
+// lay khoa hoc noi bat theo so luong nguoi tham gia
 
 const getFeaturedCourses = async (req, res) => {
   try {
@@ -494,7 +501,6 @@ const getFeaturedCourses = async (req, res) => {
     });
   }
 };
-
 const getFeaturedPaths = async (req, res) => {
   try {
     const paths = await courseModel.getFeaturedPaths();

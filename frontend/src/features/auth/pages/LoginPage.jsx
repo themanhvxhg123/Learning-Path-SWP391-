@@ -149,6 +149,18 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="btn-back-home"
+          style={{
+            background: 'none', border: 'none', color: '#008b8b', fontWeight: 600,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+            alignSelf: 'flex-start', marginBottom: '16px', padding: 0
+          }}
+        >
+          &larr; Về trang chủ
+        </button>
         <div className="auth-brand">
           <Logo height={56} link={false} className="brand-logo" />
           <h1>S.T.A.R Learning Path</h1>

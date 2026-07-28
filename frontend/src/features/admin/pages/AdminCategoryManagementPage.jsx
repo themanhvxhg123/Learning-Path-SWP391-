@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from '@/shared/ui/Toast';
 import AppButton from '@/shared/ui/AppButton';
 import AppPagination from '@/shared/ui/AppPagination';
+import ConfirmDialog from '@/shared/ui/ConfirmDialog';
 import AdminCatalogToolbar from '@/features/admin/components/AdminCatalogToolbar';
 import AdminCategoryList from '@/features/admin/components/AdminCategoryList';
 import AdminCategoryCreateDialog from '@/features/admin/components/AdminCategoryCreateDialog';
@@ -18,6 +19,7 @@ import {
   createCategory,
   getCategories,
   updateCategory,
+  deleteCategory,
 } from '@/features/admin/services/adminCategoryService';
 import { filterAndSortCategories } from '@/features/admin/utils/adminCategoryUtils';
 import {
@@ -44,6 +46,9 @@ export default function AdminCategoryManagementPage() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const queryState = useMemo(
     () => parseAdminCategoryListParams(searchParams),
@@ -168,6 +173,30 @@ export default function AdminCategoryManagementPage() {
     }
   };
 
+  const openDeleteConfirm = (category) => {
+    setDeletingCategory(category);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingCategory) return;
+
+    setDeleting(true);
+    try {
+      const res = await deleteCategory(deletingCategory.id);
+      if (!res.ok) {
+        toast.error(res.message ?? 'Không thể xoá danh mục');
+        return;
+      }
+      toast.success('Đã xoá danh mục thành công');
+      setDeleteConfirmOpen(false);
+      setDeletingCategory(null);
+      await loadCategories();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto' }}>
       <Box
@@ -232,6 +261,7 @@ export default function AdminCategoryManagementPage() {
         hasAnyCategories={categories.length > 0}
         isFiltered={showReset || Boolean(queryState.q?.trim())}
         onEdit={openEditDialog}
+        onDelete={openDeleteConfirm}
         onClearFilters={handleReset}
       />
 
@@ -263,6 +293,26 @@ export default function AdminCategoryManagementPage() {
         onSubmit={handleEditSubmit}
         saving={saving}
         existingNames={existingNames}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => {
+          if (deleting) return;
+          setDeleteConfirmOpen(false);
+          setDeletingCategory(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Xác nhận xoá danh mục"
+        message={
+          deletingCategory
+            ? `Bạn có chắc chắn muốn xoá danh mục "${deletingCategory.displayName}"? Hành động này không thể hoàn tác.`
+            : ''
+        }
+        confirmLabel="Xoá"
+        cancelLabel="Hủy"
+        loading={deleting}
+        destructive
       />
     </Box>
   );

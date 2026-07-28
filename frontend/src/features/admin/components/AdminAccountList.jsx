@@ -46,6 +46,7 @@ export default function AdminAccountList({
   hasAnyAccounts,
   isFiltered,
   onEdit,
+  onDelete,
   onClearFilters,
 }) {
   if (loading) {
@@ -97,7 +98,7 @@ export default function AdminAccountList({
     >
       <ListHeader />
       {accounts.map((account) => (
-        <AdminAccountRow key={account.id} account={account} onEdit={onEdit} />
+        <AdminAccountRow key={account.id} account={account} onEdit={onEdit} onDelete={onDelete} />
       ))}
     </Box>
   );
