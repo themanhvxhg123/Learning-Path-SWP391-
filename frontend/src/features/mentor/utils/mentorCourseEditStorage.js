@@ -1,3 +1,12 @@
+/**
+ * Draft chỉnh sửa khóa học — sessionStorage + map API ↔ UI builder.
+ *
+ * Key: mentor_course_edit_draft_{courseId}
+ * Cấu trúc draft: { course: PascalCase, paths?: [], meta?: { profileOnly?: boolean } }
+ *
+ * mapDetailPathsToEditPaths: mỗi lần load từ server tạo tempId mới (ổn định trong session edit).
+ * courseDetailToEditCourse / courseDetailToEditForm: chuẩn hóa camelCase API → form/review.
+ */
 import {
   createTempId,
   filterLearningMaterials,
@@ -90,6 +99,7 @@ export function courseDetailToEditForm(course) {
   };
 }
 
+/** Ghi draft vào sessionStorage (F5 trên trang review vẫn còn dữ liệu). */
 export function saveEditCourseDraft(courseId, draft) {
   sessionStorage.setItem(editKey(courseId), JSON.stringify(draft));
 }
@@ -104,6 +114,7 @@ export function loadEditCourseDraft(courseId) {
   }
 }
 
+/** Xóa sau khi updateCourseContent thành công (bulk sync xong). */
 export function clearEditCourseDraft(courseId) {
   sessionStorage.removeItem(editKey(courseId));
 }

@@ -17,7 +17,9 @@
  *   2. CHỈNH SỬA SECTION — Mentor chọn kỹ năng → chọn bài/section → sửa đề + câu hỏi
  *      trong `MentorQuestionBankBuilderPanel`; thay đổi lưu tạm trong state (chưa gửi API).
  *   3. LƯU SECTION — Bấm "Cập nhật section" → xác nhận (ConfirmDialog)
- *      → gọi `saveQuestionBankSection` → cập nhật baseline sau khi lưu thành công.
+ *      → `validateQuestionBankSectionBeforeBackendSave` (lớp validate FE — xem
+ *        questionBankSectionSaveValidation.js, docs/QUESTION_BANK_VALIDATION_DEFENSE.md)
+ *      → nếu hợp lệ: upload Reading (nếu cần) → `saveQuestionBankSection` → baseline.
  *      (Dialog preview JSON payload: bật SHOW_SECTION_SAVE_JSON_PREVIEW_DIALOG)
  *
  * Workspace question bank — axios tại trang.
@@ -38,7 +40,6 @@ import MentorQuestionBankSkillNav from '@/features/mentor/components/questionBan
 import {
   TEST_SKILL_LISTENING,
   TEST_SKILL_READING,
-  TEST_SKILL_VOCABULARY,
   countActiveQuestionsBySkill,
   createQuestionBankSection,
   createQuestionBankSkillSections,
@@ -50,15 +51,12 @@ import {
   finalizeSectionAfterFullQuestionRestore,
   normalizeQuestionBankSectionForSave,
   scrollToQuestionBankItem,
-  validateQuestionBankSection,
-  getQuestionBankSectionValidationToast,
   hasPendingPersistedQuestionDeletes,
   SECTION_USE_FOR_TEST_FILTER,
   countSectionsByUseForTest,
   filterSectionsByUseForTest,
-  validateSectionUseForTestRule,
-  SECTION_USE_FOR_TEST_REQUIRES_QUESTION_MESSAGE,
 } from '@/features/mentor/utils/mentorTestContentUtils';
+import { validateQuestionBankSectionBeforeBackendSave } from '@/features/mentor/utils/questionBankSectionSaveValidation';
 import {
   buildSectionBaselinesMap,
   buildSectionEditorSnapshot,
@@ -80,7 +78,6 @@ import { saveQuestionBankSection } from '@/features/mentor/services/questionBank
 import { uploadTextMaterial } from '@/features/mentor/services/materialUploadService';
 import { isHtmlContentEmpty } from '@/features/mentor/utils/mentorCourseContentUtils';
 import { getChapterQuizConfig } from '@/features/mentor/services/chapterQuizConfigService';
-import { validateListeningReadingPublishedSectionQuota, validateVocabularySectionQuestionQuota, isSkillSectionRandomPick } from '@/features/mentor/utils/mentorChapterQuizConfigUtils';
 import { useNavigationGuard } from '@/context/NavigationGuardContext';
 
 // URL gốc của backend API (lấy từ biến môi trường hoặc localhost mặc định)
@@ -610,8 +607,7 @@ export default function MentorQuestionBankManagePage() {
     closeSectionSaveDialogs();
   };
 
-  // Trigger: bấm "Lưu thay đổi" trên dialog preview
-  // Luồng: validate → upload Reading HTML nếu cần → gọi saveQuestionBankSection → cập nhật baseline + state
+  // Luồng: validate FE (một cổng) → upload Reading nếu cần → saveQuestionBankSection → baseline
   const handleConfirmSaveSection = async () => {
     if (confirmSaveInFlightRef.current) return;
 
@@ -620,57 +616,6 @@ export default function MentorQuestionBankManagePage() {
     const section = sectionsRef.current.find((s) => s.tempId === activeSectionId) ?? activeSection;
     if (!section) return;
 
-    const useForTestError = validateSectionUseForTestRule(section);
-    if (useForTestError.isUseForTest) {
-      setSectionErrors((prev) => ({
-        ...prev,
-        [section.tempId]: {
-          ...(prev[section.tempId] ?? {}),
-          isUseForTest: useForTestError.isUseForTest,
-        },
-      }));
-      toast.error(SECTION_USE_FOR_TEST_REQUIRES_QUESTION_MESSAGE);
-      setSectionSaveConfirmOpen(false);
-      return;
-    }
-
-    if (isSkillSectionRandomPick(section.SkillType)) {
-      const quotaError = validateListeningReadingPublishedSectionQuota(
-        sectionsRef.current,
-        section.SkillType,
-        chapterQuizConfig,
-      );
-      if (quotaError.isUseForTest) {
-        setSectionErrors((prev) => ({
-          ...prev,
-          [section.tempId]: {
-            ...(prev[section.tempId] ?? {}),
-            isUseForTest: quotaError.isUseForTest,
-          },
-        }));
-        toast.error(quotaError.isUseForTest);
-        closeSectionSaveDialogs();
-        return;
-      }
-    }
-
-    if (section.SkillType === TEST_SKILL_VOCABULARY) {
-      const vocabQuotaError = validateVocabularySectionQuestionQuota(section, chapterQuizConfig);
-      if (vocabQuotaError.isUseForTest || vocabQuotaError._questions) {
-        setSectionErrors((prev) => ({
-          ...prev,
-          [section.tempId]: {
-            ...(prev[section.tempId] ?? {}),
-            ...vocabQuotaError,
-          },
-        }));
-        toast.error(vocabQuotaError.isUseForTest ?? vocabQuotaError._questions);
-        closeSectionSaveDialogs();
-        return;
-      }
-    }
-
-    const normalized = normalizeQuestionBankSectionForSave(section);
     const previewPayload = savePayloadRef.current ?? buildQuestionBankSectionSavePayload(
       section,
       {
@@ -684,18 +629,20 @@ export default function MentorQuestionBankManagePage() {
     );
     const deleteQuestionsOnly = isQuestionBankDeleteOnlyPayload(previewPayload);
 
-    if (!deleteQuestionsOnly) {
-      const errors = validateQuestionBankSection(normalized, {
-        forSave: true,
-        allSections: sectionsRef.current,
-      });
-      if (Object.keys(errors).length > 0) {
-        setSectionErrors((prev) => ({ ...prev, [section.tempId]: errors }));
-        const validationToast = getQuestionBankSectionValidationToast(errors, section);
-        if (validationToast) toast.error(validationToast);
-        closeSectionSaveDialogs();
-        return;
-      }
+    const validation = validateQuestionBankSectionBeforeBackendSave({
+      section,
+      allSections: sectionsRef.current,
+      chapterQuizConfig,
+      deleteQuestionsOnly,
+    });
+    if (!validation.ok) {
+      setSectionErrors((prev) => ({
+        ...prev,
+        [section.tempId]: validation.errors,
+      }));
+      toast.error(validation.toastMessage);
+      closeSectionSaveDialogs();
+      return;
     }
 
     confirmSaveInFlightRef.current = true;
@@ -1093,8 +1040,8 @@ export default function MentorQuestionBankManagePage() {
         message={
           activeSection
             ? `Lưu thay đổi cho section "${String(
-                activeSection.SectionTitle || activeSection.DisplayName || 'hiện tại',
-              ).trim()}"?`
+              activeSection.SectionTitle || activeSection.DisplayName || 'hiện tại',
+            ).trim()}"?`
             : 'Lưu thay đổi cho section hiện tại?'
         }
         confirmLabel="Lưu thay đổi"

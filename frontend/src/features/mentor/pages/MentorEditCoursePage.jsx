@@ -1,3 +1,23 @@
+/**
+ * =============================================================================
+ * LUỒNG CHỈNH SỬA KHÓA HỌC (MENTOR) — BƯỚC 1: THÔNG TIN CƠ BẢN
+ * =============================================================================
+ *
+ * Route: GET /mentor/courses/:courseId/edit  (App.jsx → MentorLayout)
+ *
+ * Vào từ: MentorCourseDetailPage / overview → "Chỉnh sửa thông tin"
+ *
+ * Luồng dữ liệu:
+ *   1. Mount → Promise.all: danh mục, cấp độ, GET chi tiết khóa (fetchMentorCourseDetail)
+ *   2. courseDetailToEditCourse / courseDetailToEditForm → state form
+ *   3. User sửa form (MentorCourseCreateForm) — nếu đã có học viên: khóa Category/Level/Thumbnail
+ *   4. "Lưu thay đổi" → KHÔNG gọi API ngay → navigate review với location.state.editDraft
+ *      meta.profileOnly: true → review chỉ cập nhật PATCH basic info
+ *
+ * Bước tiếp: MentorEditCourseReviewPage → updateCourseBasicInfo → quay detail
+ *
+ * Chỉnh nội dung chương/bài/học liệu: route khác → MentorEditCourseContentPage (/content/edit)
+ */
 import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
@@ -29,6 +49,7 @@ import {
 } from '@/features/mentor/utils/mentorCourseEditStorage';
 import { countCourseStudents } from '@/features/mentor/utils/mentorCourseUtils';
 
+/** Map object draft PascalCase → field string cho form (select dùng string id). */
 function draftCourseToForm(course) {
   return {
     CourseName: course.CourseName ?? '',
@@ -51,6 +72,7 @@ export default function MentorEditCoursePage() {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [levelOptions, setLevelOptions] = useState([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
+  /** Bản khóa PascalCase gốc từ API — dùng merge payload và khóa field khi có học viên. */
   const [coursePascal, setCoursePascal] = useState(null);
   const [studentCount, setStudentCount] = useState(0);
   const [pageLoading, setPageLoading] = useState(true);

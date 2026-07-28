@@ -54,7 +54,7 @@ router.post('/my-courses', getMyCourses);
 // Mục lục chương / bài theo khóa học (Question Bank, quiz setup)
 router.get('/my-courses/:courseId/chapters', optionalAuth, getCourseChapters);
 
-// Chi tiết khóa học
+/** FE: fetchMentorCourseDetail → GET /api/courses/my-courses/:courseId (tab=course) */
 router.get('/my-courses/:courseId', getInformationCourse);
 
 // Lưu nháp và tạo khóa học (Role Mentor)

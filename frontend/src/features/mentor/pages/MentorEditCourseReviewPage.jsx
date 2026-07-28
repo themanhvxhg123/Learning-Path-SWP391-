@@ -1,3 +1,23 @@
+/**
+ * =============================================================================
+ * LUỒNG CHỈNH SỬA KHÓA HỌC (MENTOR) — BƯỚC 3: XEM LẠI & GỌI API
+ * =============================================================================
+ *
+ * Route: /mentor/courses/:courseId/review
+ *
+ * Nguồn draft:
+ *   • location.state.editDraft (từ trang edit info hoặc wizard content)
+ *   • fallback sessionStorage: mentorCourseEditStorage.saveEditCourseDraft
+ *
+ * profileOnly (draft.meta.profileOnly === true):
+ *   Chỉ PATCH thông tin cơ bản — không gọi updateCourseContent.
+ *
+ * Ngược lại:
+ *   updateCourseBasicInfo + updateCourseContent(paths) — upload Cloudinary pending materials,
+ *   diff với server, saveAllCoursePaths (REST từng path/node/material).
+ *
+ * Thành công → clearEditCourseDraft → navigate /mentor/courses/:courseId
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Breadcrumbs, CircularProgress, Divider, Link as MuiLink, Typography } from '@mui/material';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
@@ -202,6 +222,7 @@ export default function MentorEditCourseReviewPage() {
     toast.success('Đã cập nhật thông tin trên trang xem lại.');
   };
 
+  /** PATCH basic info; nếu không profileOnly thì sync toàn bộ paths qua updateCourseContent. */
   const handleUpdate = async () => {
     if (!courseForUpdate) return;
 

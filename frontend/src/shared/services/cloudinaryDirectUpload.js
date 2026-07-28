@@ -1,3 +1,19 @@
+/**
+ * Upload VIDEO / AUDIO thẳng từ trình duyệt lên Cloudinary (unsigned preset).
+ *
+ * Cần .env frontend:
+ *   VITE_CLOUDINARY_CLOUD_NAME
+ *   VITE_CLOUDINARY_UPLOAD_PRESET  (preset unsigned, cho phép video upload)
+ *
+ * Luồng:
+ *   1. validate file (materialUploadValidation — max 10MB, đuôi hợp lệ)
+ *   2. FormData: file + upload_preset
+ *   3. POST https://api.cloudinary.com/v1_1/{cloud}/video/upload
+ *      (Cloudinary gom cả audio vào endpoint video/upload)
+ *   4. secure_url → getCloudinaryDeliveryUrl (q_auto) → trả { url, deliveryUrl, storageUrl }
+ *
+ * Không gửi API secret qua FE — chỉ preset public.
+ */
 import { getCloudinaryDeliveryUrl } from '@/shared/utils/cloudinaryDeliveryUtils';
 import {
   LISTENING_UPLOAD_FAILED_MESSAGE,
