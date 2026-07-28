@@ -129,7 +129,7 @@ export default function MentorCreateCourseReviewPage() {
 
   const handleCreateQuestionBank = () => {
     if (successCourseId == null) return;
-    navigate(`/mentor/question-banks/manage?courseId=${successCourseId}`);
+    navigate(`/mentor/question-banks/${successCourseId}`);
     setSuccessCourseId(null);
   };
 

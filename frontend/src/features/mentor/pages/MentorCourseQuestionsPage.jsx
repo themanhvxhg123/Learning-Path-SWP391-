@@ -15,15 +15,40 @@ import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AppButton from '@/shared/ui/AppButton';
 import EmptyState from '@/shared/ui/EmptyState';
-import {
-  getMockChapterBanksForCourse,
-  getMockCourseFromQuestionBank,
-} from '@/features/mentor/data/mentorQuestionBankMock';
 import { formatMentorCourseDate } from '@/features/mentor/utils/mentorCourseUtils';
 
 const TEXT = '#0F172A';
 const MUTED = '#64748B';
 const PRIMARY = '#0891B2';
+
+/** Chỉnh demo khóa học tại đây */
+const MOCK_COURSES_BY_ID = {
+  1: { CourseName: 'Tiếng Anh Thương Mại & Giao Tiếp Công Sở' },
+  2: { CourseName: 'IELTS Band 6.5 – Luyện thi Toàn diện' },
+  3: { CourseName: 'Tiếng Anh Giao Tiếp Đời Sống Hằng Ngày' },
+};
+
+/** Chỉnh demo bank theo chương tại đây (key = courseId) */
+const MOCK_CHAPTER_BANKS_BY_COURSE_ID = {
+  3: [
+    {
+      id: 3001,
+      chapterId: 1,
+      chapterTitle: 'Chào hỏi & Giới thiệu bản thân',
+      title: 'Chào hỏi & Giới thiệu bản thân',
+      totalQuestionCount: 15,
+      updatedAt: '2026-04-01T10:00:00.000Z',
+    },
+    {
+      id: 3002,
+      chapterId: 2,
+      chapterTitle: 'Mua sắm & Hỏi giá',
+      title: 'Mua sắm & Hỏi giá',
+      totalQuestionCount: 18,
+      updatedAt: '2026-03-28T14:30:00.000Z',
+    },
+  ],
+};
 
 function BankRow({ bank, onManage }) {
   const questionCount = bank.totalQuestionCount ?? 0;
@@ -76,14 +101,15 @@ export default function MentorCourseQuestionsPage() {
   const navigate = useNavigate();
   const { courseId } = useParams();
 
-  const course = getMockCourseFromQuestionBank(courseId);
-  const banks = useMemo(() => getMockChapterBanksForCourse(courseId), [courseId]);
-  const courseName = course?.courseName ?? `Khóa học #${courseId}`;
+  const course = MOCK_COURSES_BY_ID[Number(courseId)];
+  const banks = useMemo(
+    () => MOCK_CHAPTER_BANKS_BY_COURSE_ID[Number(courseId)] ?? [],
+    [courseId],
+  );
+  const courseName = course?.CourseName ?? `Khóa học #${courseId}`;
 
   const handleManage = (bank) => {
-    navigate(
-      `/mentor/question-banks/manage?courseId=${courseId}&chapterId=${bank.chapterId}`,
-    );
+    navigate(`/mentor/question-banks/${courseId}/${bank.chapterId}`);
   };
 
   return (
@@ -214,9 +240,7 @@ export default function MentorCourseQuestionsPage() {
             title="Chưa có ngân hàng câu hỏi"
             description="Tạo bộ câu hỏi cho từng chương để bắt đầu quản lý."
             actionLabel="Tạo bộ câu hỏi"
-            onAction={() =>
-              navigate(`/mentor/question-banks/manage?courseId=${courseId}`)
-            }
+            onAction={() => navigate(`/mentor/question-banks/${courseId}`)}
           />
         </Box>
       ) : (
@@ -232,9 +256,7 @@ export default function MentorCourseQuestionsPage() {
           <AppButton
             variant="outlined"
             startIcon={<MenuBookOutlinedIcon />}
-            onClick={() =>
-              navigate(`/mentor/question-banks/manage?courseId=${courseId}`)
-            }
+            onClick={() => navigate(`/mentor/question-banks/${courseId}`)}
             sx={{ height: 40, borderRadius: '999px', fontWeight: 600 }}
           >
             Tạo bộ câu hỏi mới

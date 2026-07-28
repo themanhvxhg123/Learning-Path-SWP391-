@@ -38,12 +38,71 @@ import {
   getFilledQuestionCount,
 } from '@/features/mentor/utils/mentorTestContentUtils';
 import { formatMentorCourseDate } from '@/features/mentor/utils/mentorCourseUtils';
-import {
-  getMockChaptersForCourse,
-  getMockCourseFromQuestionBank,
-} from '@/features/mentor/data/mentorQuestionBankMock';
-import { getCourseQuestionBankActiveStats } from '@/features/mentor/services/questionBankService';
-import axios from 'axios';
+
+/** Chỉnh demo khóa học + chương tại đây (theo courseId) */
+const MOCK_COURSES_BY_ID = {
+  1: {
+    CourseId: 1,
+    CourseName: 'Tiếng Anh Thương Mại & Giao Tiếp Công Sở',
+    IsPublished: 1,
+    CategoryDisplayName: 'Tiếng Anh thương mại',
+    LevelDisplayName: 'Trung cấp',
+    CourseUpdateAt: '2026-03-18T10:30:00.000Z',
+  },
+  2: {
+    CourseId: 2,
+    CourseName: 'IELTS Band 6.5 – Luyện thi Toàn diện',
+    IsPublished: 1,
+    CategoryDisplayName: 'Luyện thi',
+    LevelDisplayName: 'Nâng cao',
+    CourseUpdateAt: '2026-04-02T14:15:00.000Z',
+  },
+  3: {
+    CourseId: 3,
+    CourseName: 'Tiếng Anh Giao Tiếp Đời Sống Hằng Ngày',
+    IsPublished: 1,
+    CategoryDisplayName: 'Giao tiếp',
+    LevelDisplayName: 'Cơ bản',
+    CourseUpdateAt: '2026-02-10T09:00:00.000Z',
+  },
+};
+
+const MOCK_CHAPTERS_BY_COURSE_ID = {
+  1: [
+    {
+      PathId: 1,
+      PathName: 'Khởi động & Làm quen thuật ngữ',
+      Order: 1,
+      Nodes: [{ NodeId: 101, NodeName: 'Chào hỏi công sở', NodeOrder: 1 }],
+    },
+    {
+      PathId: 2,
+      PathName: 'Kỹ năng viết Email chuyên nghiệp',
+      Order: 2,
+      Nodes: [{ NodeId: 201, NodeName: 'Cấu trúc email', NodeOrder: 1 }],
+    },
+  ],
+  3: [
+    {
+      PathId: 1,
+      PathName: 'Chào hỏi & Giới thiệu bản thân',
+      Order: 1,
+      Nodes: [{ NodeId: 301, NodeName: 'Hello & Hi', NodeOrder: 1 }],
+    },
+    {
+      PathId: 2,
+      PathName: 'Mua sắm & Hỏi giá',
+      Order: 2,
+      Nodes: [{ NodeId: 302, NodeName: 'How much is it?', NodeOrder: 1 }],
+    },
+    {
+      PathId: 3,
+      PathName: 'Nhà hàng & Gọi món',
+      Order: 3,
+      Nodes: [{ NodeId: 303, NodeName: 'Can I have the menu?', NodeOrder: 1 }],
+    },
+  ],
+};
 
 //________Component con: thẻ hiển thị một chương trong danh sách__________
 // Trigger click → gọi onOpen(path) để parent navigate sang trang workspace
@@ -176,34 +235,19 @@ export default function MentorQuestionBankDetailPage() {
   const [chapterStatsByPathId, setChapterStatsByPathId] = useState({});
   const [statsLoaded, setStatsLoaded] = useState(false);
 
-  // ===== useEffect: TẢI KHÓA HỌC + DANH SÁCH CHƯƠNG =====
+  // ===== Dữ liệu demo (giao diện) =====
   useEffect(() => {
-    const fetchData = async () => {
-      setStatsLoaded(false);
-      try {
-        const [resCourse, resCoursePaths, statsRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/courses/my-courses/${courseId}?tab=course`),
-          axios.get(`http://localhost:5000/api/courses/my-courses/${courseId}/chapters`),
-          getCourseQuestionBankActiveStats(courseId),
-        ]);
-
-        setCourse(resCourse.data.data[0]);
-        setCoursePaths(resCoursePaths.data.data.Paths ?? []);
-
-        const nextStatsByPathId = {};
-        if (statsRes.ok) {
-          (statsRes.chapters ?? []).forEach((chapter) => {
-            nextStatsByPathId[String(chapter.PathId)] = chapter;
-          });
-        }
-        setChapterStatsByPathId(nextStatsByPathId);
-      } catch (error) {
-        console.error(error.message);
-      } finally {
-        setStatsLoaded(true);
-      }
-    };
-    fetchData();
+    const mockCourse = MOCK_COURSES_BY_ID[Number(courseId)];
+    setCourse(
+      mockCourse ?? {
+        CourseId: courseId,
+        CourseName: `Khóa học #${courseId}`,
+        IsPublished: true,
+      },
+    );
+    setCoursePaths(MOCK_CHAPTERS_BY_COURSE_ID[Number(courseId)] ?? []);
+    setChapterStatsByPathId({});
+    setStatsLoaded(true);
   }, [courseId]);
 
   const chapterId = searchParams.get('chapterId') ?? '';
@@ -211,7 +255,7 @@ export default function MentorQuestionBankDetailPage() {
   // const isPathListMode = !chapterId;
 
   // const course = getMockCourseFromQuestionBank(courseId);
-  const courseChapters = getMockChaptersForCourse(courseId);
+  const courseChapters = MOCK_CHAPTERS_BY_COURSE_ID[Number(courseId)] ?? [];
   const selectedChapter = courseChapters.find(
     (item) => String(item.PathId) === String(chapterId),
   );

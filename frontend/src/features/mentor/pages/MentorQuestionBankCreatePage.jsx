@@ -13,13 +13,15 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 
 export default function MentorQuestionBankCreatePage() {
   const [searchParams] = useSearchParams();
-  // Giữ query params khi redirect (ví dụ ?courseId=3)
-  const query = searchParams.toString();
+  const courseId = searchParams.get('courseId');
+  const chapterId = searchParams.get('chapterId');
 
-  return (
-    <Navigate
-      to={query ? `/mentor/question-banks/manage?${query}` : '/mentor/question-banks/manage'}
-      replace
-    />
-  );
+  if (courseId && chapterId) {
+    return <Navigate to={`/mentor/question-banks/${courseId}/${chapterId}`} replace />;
+  }
+  if (courseId) {
+    return <Navigate to={`/mentor/question-banks/${courseId}`} replace />;
+  }
+
+  return <Navigate to="/mentor/question-banks" replace />;
 }

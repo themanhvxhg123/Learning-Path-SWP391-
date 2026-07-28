@@ -19,7 +19,6 @@ import { Box, Breadcrumbs, Link as MuiLink, Typography, alpha } from '@mui/mater
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
 import AppButton from '@/shared/ui/AppButton';
 import AppPagination from '@/shared/ui/AppPagination';
 import EmptyState from '@/shared/ui/EmptyState';
@@ -27,7 +26,6 @@ import Loading from '@/shared/ui/Loading';
 import MentorQuestionBankRow from '@/features/mentor/components/questionBank/MentorQuestionBankRow';
 import MentorQuestionBankToolbar from '@/features/mentor/components/questionBank/MentorQuestionBankToolbar';
 import MentorSelectCourseForQBDialog from '@/features/mentor/components/questionBank/MentorSelectCourseForQBDialog';
-import { mentorQuestionBankFilterOptionsMock } from '@/features/mentor/data/mentorQuestionBankMock';
 import {
   parseQBListParams,
   hasActiveQBFilters,
@@ -40,6 +38,71 @@ import {
 } from '@/features/mentor/utils/mentorQuestionBankListParams';
 
 const PAGE_SIZE = 8;
+
+/** Chỉnh demo danh sách khóa học tại đây */
+const MOCK_QUESTION_BANK_LIST = [
+  {
+    CourseId: 1,
+    CourseName: 'Tiếng Anh Thương Mại & Giao Tiếp Công Sở',
+    CourseDescription:
+      'Nắm vững thuật ngữ kinh doanh, cách viết email chuyên nghiệp và văn hóa giao tiếp doanh nghiệp.',
+    IsPublished: true,
+    TotalQuestion: 85,
+    TotalQuestionIsPublic: 60,
+    TotalDraftQuestion: 25,
+    ChapterWithQuestionCount: 3,
+    QuizCount: 4,
+    UpdatedAt: '2026-03-18T10:30:00.000Z',
+    Thumbnail: null,
+  },
+  {
+    CourseId: 2,
+    CourseName: 'IELTS Band 6.5 – Luyện thi Toàn diện',
+    CourseDescription:
+      'Chiến lược làm bài 4 kỹ năng Listening, Reading, Writing, Speaking nhắm mục tiêu band 6.5+.',
+    IsPublished: true,
+    TotalQuestion: 120,
+    TotalQuestionIsPublic: 95,
+    TotalDraftQuestion: 25,
+    ChapterWithQuestionCount: 5,
+    QuizCount: 8,
+    UpdatedAt: '2026-04-02T14:15:00.000Z',
+    Thumbnail: null,
+  },
+  {
+    CourseId: 3,
+    CourseName: 'Tiếng Anh Giao Tiếp Đời Sống Hằng Ngày',
+    CourseDescription:
+      'Luyện tập các tình huống giao tiếp thường nhật như mua sắm, hỏi đường, nhà hàng, du lịch.',
+    IsPublished: true,
+    TotalQuestion: 64,
+    TotalQuestionIsPublic: 64,
+    TotalDraftQuestion: 0,
+    ChapterWithQuestionCount: 4,
+    QuizCount: 5,
+    UpdatedAt: '2026-02-10T09:00:00.000Z',
+    Thumbnail: null,
+  },
+];
+
+const MOCK_FILTER_OPTIONS = {
+  statusOptions: [
+    { value: 'all', label: 'Tất cả' },
+    { value: 'published', label: 'Đã xuất bản' },
+    { value: 'draft', label: 'Bản nháp' },
+  ],
+  questionStatusOptions: [
+    { value: 'all', label: 'Tất cả câu hỏi' },
+    { value: 'has_draft', label: 'Có câu hỏi nháp' },
+    { value: 'all_published', label: 'Xuất bản hết' },
+    { value: 'empty', label: 'Chưa có câu hỏi' },
+  ],
+  sortOptions: [
+    { value: 'updated_desc', label: 'Mới cập nhật' },
+    { value: 'name_asc', label: 'Tên A-Z' },
+    { value: 'questions_desc', label: 'Nhiều câu hỏi nhất' },
+  ],
+};
 
 export default function MentorQuestionBankListPage() {
   const navigate = useNavigate();
@@ -59,57 +122,16 @@ export default function MentorQuestionBankListPage() {
   const queryState = useMemo(() => parseQBListParams(searchParams), [searchParams]);
   const showReset = hasActiveQBFilters(queryState);
   const activeFilterChips = useMemo(
-    () => buildQBActiveChips(queryState, mentorQuestionBankFilterOptionsMock),
+    () => buildQBActiveChips(queryState, MOCK_FILTER_OPTIONS),
     [queryState],
   );
 
-  // ===== useEffect: TẢI DỮ LIỆU KHI VÀO TRANG =====
-  // Gọi 2 API song song: danh sách bank của mentor + tất cả khóa học của mentor
-  // → lọc ra khóa học chưa có bank để hiện trong dialog "Tạo bộ câu hỏi"
+  // ===== useEffect: dữ liệu demo (giao diện) =====
   useEffect(() => {
-    let isMounted = true;
-
-    const loadItems = async () => {
-      try {
-        const userRaw = localStorage.getItem('user');
-        const user = JSON.parse(userRaw);
-        setLoading(true);
-
-        const [bankRes, courseRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/question-bank/getAllBankOfMentor', {
-            params: { userId: user.userId },
-          }),
-          axios.post('http://localhost:5000/api/courses/my-courses', {
-            userId: user.userId,
-            roleName: user.roles[0],
-          }),
-        ]);
-
-        if (!isMounted) return;
-
-        setListQuestionBank(bankRes.data.questionBanks);
-
-        const listAllCourse = courseRes.data.data;
-        const listCourseWithBank = bankRes.data.questionBanks;
-        const listCourseNoBank = listAllCourse.filter(
-          (course) =>
-            !listCourseWithBank.some((item) => item.CourseId === course.CourseId),
-        );
-        setCoursesWithoutQB(listCourseNoBank);
-      } catch (err) {
-        console.error(err.message);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadItems();
-
-    return () => {
-      isMounted = false;
-    };
+    setLoading(true);
+    setListQuestionBank(MOCK_QUESTION_BANK_LIST);
+    setCoursesWithoutQB([]);
+    setLoading(false);
   }, []);
 
   // Cập nhật query params trên URL (replace để không tạo history entry mới)
@@ -271,6 +293,9 @@ export default function MentorQuestionBankListPage() {
         onReset={handleReset}
         activeFilterChips={activeFilterChips}
         onRemoveFilterChip={handleRemoveChip}
+        statusOptions={MOCK_FILTER_OPTIONS.statusOptions}
+        questionStatusOptions={MOCK_FILTER_OPTIONS.questionStatusOptions}
+        sortOptions={MOCK_FILTER_OPTIONS.sortOptions}
       />
 
       {/* Danh sách khóa học (hoặc loading/empty) */}
