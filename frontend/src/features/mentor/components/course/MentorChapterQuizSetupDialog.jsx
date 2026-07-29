@@ -26,11 +26,7 @@ import {
   saveCourseQuizConfig,
   getChapterQuizConfigsByCourse,
 } from '@/features/mentor/services/chapterQuizConfigService';
-import {
-  getChapterQuestionBankActiveStats,
-  getCourseQuestionBankActiveStats,
-  fetchChapterSections,
-} from '@/features/mentor/services/questionBankService';
+import questionBankService from '@/features/mentor/services/questionBankService';
 import {
   CHAPTER_QUIZ_SKILLS,
   COURSE_QUIZ_CHAPTER_ID,
@@ -380,7 +376,7 @@ export default function MentorChapterQuizSetupDialog({
       if (isCourseScope) {
         const [configRes, statsRes] = await Promise.all([
           getCourseQuizConfig(courseId, { courseTitle }),
-          getCourseQuestionBankActiveStats(courseId),
+          questionBankService.getCourseQuestionBankActiveStats(courseId),
         ]);
 
         setAllCourseStats(statsRes.ok ? statsRes : { hasBank: false, chapters: [] });
@@ -406,7 +402,7 @@ export default function MentorChapterQuizSetupDialog({
 
       const [configRes, statsResRaw, courseConfigsRes] = await Promise.all([
         getChapterQuizConfig(courseId, chapterId, { chapterTitle, chapterIndex }),
-        getChapterQuestionBankActiveStats(courseId, chapterId),
+        questionBankService.getChapterQuestionBankActiveStats(courseId, chapterId),
         showPrerequisiteConfig
           ? getChapterQuizConfigsByCourse(courseId)
           : Promise.resolve({ ok: true, configs: [] }),
@@ -420,7 +416,7 @@ export default function MentorChapterQuizSetupDialog({
           || !(statsRes.vocabularySectionGroups?.length > 0);
 
         if (needsSectionFallback) {
-          const sectionsRes = await fetchChapterSections(courseId, chapterId);
+          const sectionsRes = await questionBankService.fetchChapterSections(courseId, chapterId);
           if (sectionsRes.ok) {
             const sections = sectionsRes.sections ?? [];
             statsRes = {

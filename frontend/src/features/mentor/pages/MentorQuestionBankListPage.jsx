@@ -37,53 +37,10 @@ import {
   QB_LIST_DEFAULTS,
 } from '@/features/mentor/utils/mentorQuestionBankListParams';
 
+import questionBankService from '../services/questionBankService';
+
 const PAGE_SIZE = 8;
 
-/** Chỉnh demo danh sách khóa học tại đây */
-const MOCK_QUESTION_BANK_LIST = [
-  {
-    CourseId: 1,
-    CourseName: 'Tiếng Anh Thương Mại & Giao Tiếp Công Sở',
-    CourseDescription:
-      'Nắm vững thuật ngữ kinh doanh, cách viết email chuyên nghiệp và văn hóa giao tiếp doanh nghiệp.',
-    IsPublished: true,
-    TotalQuestion: 85,
-    TotalQuestionIsPublic: 60,
-    TotalDraftQuestion: 25,
-    ChapterWithQuestionCount: 3,
-    QuizCount: 4,
-    UpdatedAt: '2026-03-18T10:30:00.000Z',
-    Thumbnail: null,
-  },
-  {
-    CourseId: 2,
-    CourseName: 'IELTS Band 6.5 – Luyện thi Toàn diện',
-    CourseDescription:
-      'Chiến lược làm bài 4 kỹ năng Listening, Reading, Writing, Speaking nhắm mục tiêu band 6.5+.',
-    IsPublished: true,
-    TotalQuestion: 120,
-    TotalQuestionIsPublic: 95,
-    TotalDraftQuestion: 25,
-    ChapterWithQuestionCount: 5,
-    QuizCount: 8,
-    UpdatedAt: '2026-04-02T14:15:00.000Z',
-    Thumbnail: null,
-  },
-  {
-    CourseId: 3,
-    CourseName: 'Tiếng Anh Giao Tiếp Đời Sống Hằng Ngày',
-    CourseDescription:
-      'Luyện tập các tình huống giao tiếp thường nhật như mua sắm, hỏi đường, nhà hàng, du lịch.',
-    IsPublished: true,
-    TotalQuestion: 64,
-    TotalQuestionIsPublic: 64,
-    TotalDraftQuestion: 0,
-    ChapterWithQuestionCount: 4,
-    QuizCount: 5,
-    UpdatedAt: '2026-02-10T09:00:00.000Z',
-    Thumbnail: null,
-  },
-];
 
 const MOCK_FILTER_OPTIONS = {
   statusOptions: [
@@ -129,9 +86,20 @@ export default function MentorQuestionBankListPage() {
   // ===== useEffect: dữ liệu demo (giao diện) =====
   useEffect(() => {
     setLoading(true);
-    setListQuestionBank(MOCK_QUESTION_BANK_LIST);
-    setCoursesWithoutQB([]);
-    setLoading(false);
+    // setListQuestionBank(MOCK_QUESTION_BANK_LIST);
+    // setCoursesWithoutQB([]);
+    // setLoading(false);
+    const resListQuestionBank = async () => {
+      try {
+        const resListQuestionBank = await questionBankService.getQuestionBankListSummaries()
+        setListQuestionBank(resListQuestionBank.listQuestionBank)
+        setCoursesWithoutQB(await questionBankService.getCourseWithoutQuestionBank())
+        setLoading(false);
+      } catch (error) {
+        console.error(error.message)
+      }
+    }
+    resListQuestionBank()
   }, []);
 
   // Cập nhật query params trên URL (replace để không tạo history entry mới)

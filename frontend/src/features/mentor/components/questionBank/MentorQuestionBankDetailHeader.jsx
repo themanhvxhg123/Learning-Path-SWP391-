@@ -293,7 +293,7 @@ export default function MentorQuestionBankDetailHeader({
               <MetaLine
                 icon={QuizOutlinedIcon}
                 label="Tổng câu hỏi"
-                value={totalQuestionCount}
+                value={`${totalQuestionCount} câu hỏi`}
               />
               {createdAt ? (
                 <MetaLine

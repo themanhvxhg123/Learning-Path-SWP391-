@@ -16,7 +16,7 @@ import {
   buildCourseSectionTempId,
   getConfiguredSkillTypes,
 } from '@/features/mentor/utils/mentorChapterQuizConfigUtils';
-import { findQuestionBankByChapter } from '@/features/mentor/services/questionBankService';
+import questionBankService from '@/features/mentor/services/questionBankService';
 
 function shuffleArray(items = []) {
   const next = [...items];
@@ -378,7 +378,7 @@ export function mergeRawPapersByConfig(backendPaper, configPaper, config = {}) {
 }
 
 export function buildChapterTestPaper(courseId, chapterId, config) {
-  const bankRes = findQuestionBankByChapter(courseId, chapterId);
+  const bankRes = questionBankService.findQuestionBankByChapter(courseId, chapterId);
   if (!bankRes.ok || !bankRes.bank) {
     return { ok: false, message: 'Chương chưa có ngân hàng câu hỏi.' };
   }
@@ -394,7 +394,7 @@ export function buildChapterTestPaper(courseId, chapterId, config) {
 export function buildCourseTestPaper(courseId, config) {
   const selectedIds = (config.selectedChapterIds ?? []).map(String);
   const banks = selectedIds
-    .map((chapterId) => findQuestionBankByChapter(courseId, chapterId))
+    .map((chapterId) => questionBankService.findQuestionBankByChapter(courseId, chapterId))
     .filter((res) => res.ok && res.bank)
     .map((res) => res.bank);
 

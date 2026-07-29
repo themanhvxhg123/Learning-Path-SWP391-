@@ -1,18 +1,18 @@
 /**
- * Question bank — UI-only stubs (không gọi API).
- * Giữ chữ ký hàm để các màn hình/dialog vẫn render.
+ * questionBankService — gọi API / stub tối thiểu cho UI còn import.
+ * Các hàm khác đã gỡ khi không còn reference trong repo.
  */
 
-const TODO = 'Ngân hàng câu hỏi chỉ hiển thị giao diện — chưa kết nối xử lý.';
+import axios from "axios";
+
+const API_BASE = 'http://localhost:5000/api';
+
+const TODO = 'Chỉ giao diện — chưa kết nối server.';
 
 const emptyStats = {
   ok: true,
   hasBank: false,
-  questionCountBySkill: {
-    LISTENING: 0,
-    READING: 0,
-    VOCABULARY: 0,
-  },
+  questionCountBySkill: { LISTENING: 0, READING: 0, VOCABULARY: 0 },
   listeningSectionGroups: [],
   readingSectionGroups: [],
   vocabularySectionGroups: [],
@@ -26,32 +26,6 @@ function mapSectionGroups(groups = []) {
     availableCount: Math.max(0, Number(group.availableCount ?? 0)),
     isUseForTest: group.isUseForTest !== false,
   }));
-}
-
-function mapChapterActiveStatsPayload(payload = {}) {
-  const questionCountBySkill = {
-    LISTENING: Number(payload.questionCountBySkill?.LISTENING) || 0,
-    READING: Number(payload.questionCountBySkill?.READING) || 0,
-    VOCABULARY:
-      Number(payload.questionCountBySkill?.VOCABULARY ?? payload.questionCountBySkill?.WRITING) || 0,
-  };
-  const totalActive = Number(payload.totalActive);
-  const resolvedTotal = Number.isFinite(totalActive)
-    ? totalActive
-    : Object.values(questionCountBySkill).reduce((sum, count) => sum + count, 0);
-
-  return {
-    ok: true,
-    hasBank: Boolean(payload.hasBank),
-    questionCountBySkill,
-    listeningSectionGroups: mapSectionGroups(payload.listeningSectionGroups),
-    readingSectionGroups: mapSectionGroups(payload.readingSectionGroups),
-    vocabularySectionGroups: mapSectionGroups(
-      payload.vocabularySectionGroups ?? payload.writingSectionGroups,
-    ),
-    totalActive: resolvedTotal,
-    questionPathId: payload.questionPathId ?? null,
-  };
 }
 
 function mapCourseActiveStatsPayload(payload = {}) {
@@ -91,145 +65,94 @@ function mapCourseActiveStatsPayload(payload = {}) {
   };
 }
 
-export function invalidateQuestionBankListCache() {}
+const questionBankService = {
+  /** MentorChapterQuizSetupDialog */
+  async fetchChapterSections() {
+    return { ok: true, questionPathId: null, sections: [] };
+  },
 
-export async function fetchChapterSections() {
-  return { ok: true, questionPathId: null, sections: [] };
-}
+  /** MentorChapterQuizSetupDialog */
+  async getChapterQuestionBankActiveStats() {
+    return { ...emptyStats };
+  },
 
-export async function fetchSectionQuestions() {
-  return { ok: true, questions: [] };
-}
+  /** this function use for {MentorQuestionBankDetailPage, MentorChapterQuizSetupDialog} */
+  async getCourseQuestionBankActiveStats(courseId) {
+    const empty = mapCourseActiveStatsPayload({});
 
-export async function getChapterQuestionBankActiveStats() {
-  return { ...emptyStats };
-}
+    try {
+      const response = await fetch(
+        `${API_BASE}/questionBank/courses/${Number(courseId)}/active-stats`,
+      );
+      const result = await response.json();
 
-export async function getCourseQuestionBankActiveStats() {
-  return mapCourseActiveStatsPayload({});
-}
+      if (!result.status) {
+        return { ...empty, ok: false, message: result.message };
+      }
 
-export async function getQuestionBanks() {
-  return { ok: true, banks: [] };
-}
+      return mapCourseActiveStatsPayload(result.data);
+    } catch (error) {
+      console.error(error);
+      return { ...empty, ok: false, message: 'Không lấy được thống kê ngân hàng câu hỏi' };
+    }
+  },
 
-export async function fetchPathQuestionBank() {
-  return { ok: false, message: TODO };
-}
+  /** courseTestPaperUtils.buildChapterTestPaper / buildCourseTestPaper */
+  findQuestionBankByChapter() {
+    return { ok: false, message: TODO };
+  },
 
-export async function fetchBankPathList() {
-  return { ok: false, message: TODO, bank: null, paths: [] };
-}
+  /** Get list question bank  */
+  async getQuestionBankListSummaries() {
+    try {
+      const userString = localStorage.getItem('user');
+      const user = userString ? JSON.parse(userString) : null;
 
-export async function fetchQuestionBankById() {
-  return { ok: false, message: TODO };
-}
+      const response = await fetch(
+        `http://localhost:5000/api/questionBank/getAllListQuestionBank?userId=${user.userId}&roleName=${user.roles[0]}`,
+      );
 
-export async function getQuestionBankById() {
-  return { ok: false, message: TODO };
-}
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-export async function setChapterQuestionPublic() {
-  return { ok: false, message: TODO };
-}
+      const result = await response.json();
 
-export async function deleteChapterQuestion() {
-  return { ok: false, message: TODO };
-}
+      return {
+        status: response.status,
+        listQuestionBank: result.data ?? [],
+      };
+    } catch (error) {
+      console.error(error.message);
 
-export async function setAllChapterQuestionsPublic() {
-  return { ok: false, message: TODO };
-}
+      return {
+        status: false,
+        listQuestionBank: [],
+      };
+    }
+  },
 
-export async function findQuestionBankByChapter() {
-  return { ok: false, message: TODO };
-}
+  // course without question bank
+  async getCourseWithoutQuestionBank() {
+    try {
+      const resCourses = await axios.post("http://localhost:5000/api/courses/my-courses",
+        {
+          "userId": 2,
+          "roleName": "Mentor"
+        }
+      )
+      const resListQuestionBank = await this.getQuestionBankListSummaries()
+      const coursesWithoutQuestionBank = resCourses.data.data.filter(
+        (course) =>
+          !resListQuestionBank.listQuestionBank.some(
+            (qb) => Number(qb.CourseId) === Number(course.CourseId)
+          ) ? course : ''
+      );
+      return coursesWithoutQuestionBank
+    } catch (error) {
+      console.error(error.message)
+    }
+  }
+};
 
-export async function getQuestionBankByChapter() {
-  return { ok: false, message: TODO };
-}
-
-export async function getQuestionBanksByCourse() {
-  return { ok: true, banks: [] };
-}
-
-export async function getQuestionBanksByScope() {
-  return { ok: true, banks: [] };
-}
-
-export async function getQuestionBanksForQuiz() {
-  return { ok: true, banks: [] };
-}
-
-export async function getCourseChapterBankStats() {
-  return {
-    ok: true,
-    chapterBankCount: 0,
-    chaptersWithQuestions: 0,
-    questionCountBySkill: emptyStats.questionCountBySkill,
-    totalQuestions: 0,
-    banks: [],
-  };
-}
-
-export async function getQuestionBankListSummaries() {
-  return { ok: true, items: [] };
-}
-
-export async function createQuestionBank() {
-  return { ok: false, message: TODO };
-}
-
-export async function updatePathQuestions() {
-  return { ok: false, message: TODO };
-}
-
-export async function ensureQuestionPathForChapter() {
-  return { ok: true, questionPathId: null, created: false, message: TODO };
-}
-
-export async function saveQuestionBankSection() {
-  return { ok: true, message: TODO };
-}
-
-export async function updateQuestionBankSectionSourceUrl() {
-  return { ok: true, sourceUrl: null, message: TODO };
-}
-
-export async function updateQuestionUseForTest() {
-  return { ok: true, message: TODO };
-}
-
-export async function updateQuestionBank() {
-  return { ok: false, message: TODO };
-}
-
-export async function fetchCoursesForQB() {
-  return { ok: true, courses: [] };
-}
-
-export async function fetchCourseForQB() {
-  return { ok: false, message: TODO };
-}
-
-export async function fetchCourseContentOutlineForQB() {
-  return { ok: true, chapters: [] };
-}
-
-export async function fetchChaptersForCourse() {
-  return { ok: true, chapters: [] };
-}
-
-export const getCourseChapters = fetchChaptersForCourse;
-
-export async function fetchChaptersWithoutQuestionBank() {
-  return { ok: true, chapters: [] };
-}
-
-export async function fetchCoursesWithChaptersMissingBank() {
-  return { ok: true, courses: [] };
-}
-
-export async function fetchCoursesWithoutQuestionBank() {
-  return fetchCoursesWithChaptersMissingBank();
-}
+export default questionBankService;

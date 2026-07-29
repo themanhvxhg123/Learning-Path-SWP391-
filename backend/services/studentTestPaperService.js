@@ -1,4 +1,4 @@
-const questionBankModel = require('../Models/questionBankModel');
+const testService = require('./testService');
 const chapterQuizConfigModel = require('../Models/chapterQuizConfigModel');
 const { randomizeTestPaperFromConfig } = require('./testPaperRandomService');
 
@@ -50,7 +50,7 @@ async function loadSectionsForPaths(courseId, pathIds = []) {
     const pathMeta = await chapterQuizConfigModel.getPathMeta(courseId, pathId);
     const pathName = pathMeta?.PathName ?? null;
     const pathOrder = Number(pathMeta?.PathOrder ?? 0) || null;
-    const sections = await questionBankModel.getSectionsByPath(courseId, pathId);
+    const sections = await testService.getSectionsByPath(courseId, pathId);
     sections.forEach((section) => {
       allSections.push({
         ...section,
@@ -104,7 +104,7 @@ function assertConfigHasQuizSources(config, scopeLabel = 'bài kiểm tra') {
 async function buildPaperFromConfig(config, sectionsData, options = {}) {
   return randomizeTestPaperFromConfig(config, sectionsData, {
     chapterSectionCounts: options.chapterSectionCounts ?? {},
-    loadQuestionsForSection: (sectionId) => questionBankModel.getQuestionsBySection(sectionId),
+    loadQuestionsForSection: (sectionId) => testService.getQuestionsBySection(sectionId),
   });
 }
 

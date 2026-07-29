@@ -26,7 +26,7 @@
 
 // --- Models: truy vấn DB trực tiếp (Test_Attempts, đáp án, stat...) ---
 const studentTestModel = require('../Models/studentTestModel');
-const questionBankModel = require('../Models/questionBankModel');
+const testService = require('../services/testService');
 const courseModel = require('../models/coursesModel');
 
 // --- Services: logic nghiệp vụ (config mentor, random đề, đề xuất, stat...) ---
@@ -396,7 +396,7 @@ const startTestAttempt = async (req, res) => {
             paperConfig = config;
 
             // Lấy tất cả section Nghe/Đọc/Từ vựng của chương từ question bank
-            const sectionsData = await questionBankModel.getSectionsByPath(courseId, pathId);
+            const sectionsData = await testService.getSectionsByPath(courseId, pathId);
             try {
                 paper = await studentTestPaperService.buildChapterTestPaper(config, sectionsData);
             } catch (paperError) {

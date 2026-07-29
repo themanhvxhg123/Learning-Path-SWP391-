@@ -1,156 +1,75 @@
 /**
- * MentorQuestionBankManagePage — workspace ngân hàng câu hỏi (chỉ giao diện).
+
+ * MentorQuestionBankManagePage — workspace ngân hàng câu hỏi (UI; chưa nối API/lưu).
+
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ScrollToTopButton from '@/shared/ui/ScrollToTopButton';
-import { toast } from '@/shared/ui/Toast';
 import MentorQuestionBankBuilderPanel from '@/features/mentor/components/questionBank/MentorQuestionBankBuilderPanel';
 import MentorQuestionBankDetailHeader from '@/features/mentor/components/questionBank/MentorQuestionBankDetailHeader';
 import MentorQuestionBankOutlinePanel from '@/features/mentor/components/questionBank/MentorQuestionBankOutlinePanel';
 import MentorQuestionBankSkillNav from '@/features/mentor/components/questionBank/MentorQuestionBankSkillNav';
 import useQuestionBankEditorUi from '@/features/mentor/hooks/useQuestionBankEditorUi';
-import useQuestionBankSectionCommit from '@/features/mentor/hooks/useQuestionBankSectionCommit';
 import {
   SECTION_USE_FOR_TEST_FILTER,
-  countActiveQuestionsBySkill,
-  countSectionsByUseForTest,
-  filterSectionsByUseForTest,
-  getFilledQuestionCount,
-  getVisibleSectionsBySkill,
 } from '@/features/mentor/utils/mentorTestContentUtils';
-
-/** Chỉnh demo khóa học + chương tại đây (theo courseId) */
-const MOCK_COURSES_BY_ID = {
-  1: {
-    CourseName: 'Tiếng Anh Thương Mại & Giao Tiếp Công Sở',
-    IsPublished: 1,
-    CategoryDisplayName: 'Tiếng Anh thương mại',
-    LevelDisplayName: 'Trung cấp',
-  },
-  2: {
-    CourseName: 'IELTS Band 6.5 – Luyện thi Toàn diện',
-    IsPublished: 1,
-    CategoryDisplayName: 'Luyện thi',
-    LevelDisplayName: 'Nâng cao',
-  },
-  3: {
-    CourseName: 'Tiếng Anh Giao Tiếp Đời Sống Hằng Ngày',
-    IsPublished: 1,
-    CategoryDisplayName: 'Giao tiếp',
-    LevelDisplayName: 'Cơ bản',
-  },
-};
-
-const MOCK_CHAPTERS_BY_COURSE_ID = {
-  1: [
-    { PathId: 1, PathName: 'Khởi động & Làm quen thuật ngữ', Order: 1 },
-    { PathId: 2, PathName: 'Kỹ năng viết Email chuyên nghiệp', Order: 2 },
-  ],
-  3: [
-    { PathId: 1, PathName: 'Chào hỏi & Giới thiệu bản thân', Order: 1 },
-    { PathId: 2, PathName: 'Mua sắm & Hỏi giá', Order: 2 },
-    { PathId: 3, PathName: 'Nhà hàng & Gọi món', Order: 3 },
-  ],
-};
+import axios from 'axios';
 
 export default function MentorQuestionBankManagePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { courseId, pathId } = useParams();
   const navState = location.state ?? {};
-
-  const mockCourse = MOCK_COURSES_BY_ID[Number(courseId)];
   const course = useMemo(
     () => ({
       CourseId: courseId,
-      CourseName: navState.courseName ?? mockCourse?.CourseName ?? `Khóa học #${courseId}`,
-      IsPublished: navState.coursePublished ?? Boolean(mockCourse?.IsPublished),
-      CategoryDisplayName: navState.categoryName ?? mockCourse?.CategoryDisplayName,
-      LevelDisplayName: navState.levelName ?? mockCourse?.LevelDisplayName,
+      CourseName: navState.CourseName ?? `Khóa học #${courseId}`,
+      PathName: navState.PathName,
+      IsPublished: navState.IsPublished,
+      CategoryDisplayName: navState.CategoryDisplayName,
+      LevelDisplayName: navState.LevelDisplayName,
     }),
-    [courseId, mockCourse, navState],
+    [courseId, navState],
   );
 
   const coursePaths = useMemo(
-    () => MOCK_CHAPTERS_BY_COURSE_ID[Number(courseId)] ?? [],
-    [courseId],
+    () => [
+      {
+        PathId: pathId,
+        PathName: navState.PathName ?? `Chương #${pathId}`,
+        Order: navState.PathOrder ?? 1,
+      },
+    ],
+    [pathId, navState.PathName, navState.PathOrder],
   );
-  const selectedPath = coursePaths.find((item) => String(item.PathId) === String(pathId));
-  const bankTitle =
-    navState.pathName?.trim() ?? selectedPath?.PathName?.trim() ?? `Chương #${pathId}`;
+
   const courseCategory = [course.CategoryDisplayName, course.LevelDisplayName]
     .filter(Boolean)
     .join(' · ');
 
-  const [sectionUseForTestFilter, setSectionUseForTestFilter] = useState(
-    SECTION_USE_FOR_TEST_FILTER.ALL,
-  );
-  const [sectionBaselines] = useState({});
-  const [sectionSourceBaselines] = useState({});
-  const [updatingSectionId] = useState('');
+  const [sectionUseForTestFilter] = useState(SECTION_USE_FOR_TEST_FILTER.ALL);
 
   const {
     sections,
     sectionErrors,
     activeSkill,
-    activeSection,
-    activeSectionIndex,
-    skillSections: skillSectionsFiltered,
     activeSectionId,
-    handleSectionChange,
     handleSkillSelect,
-    handleSectionSelect,
-    handleAddBai,
     handleOutlineNavigate,
   } = useQuestionBankEditorUi({ resetKey: pathId });
-
-  const { bindSectionControls, flushActiveSection } = useQuestionBankSectionCommit();
-
-  const skillSectionsAll = useMemo(
-    () => getVisibleSectionsBySkill(sections, activeSkill),
-    [sections, activeSkill],
-  );
-
-  const skillSections = useMemo(
-    () => filterSectionsByUseForTest(skillSectionsAll, sectionUseForTestFilter),
-    [skillSectionsAll, sectionUseForTestFilter],
-  );
-
-  const sectionUseForTestCounts = useMemo(
-    () => countSectionsByUseForTest(skillSectionsAll),
-    [skillSectionsAll],
-  );
-
-  const questionCount = getFilledQuestionCount(sections);
-  const questionCountBySkill = countActiveQuestionsBySkill(sections);
-
-  const handleUpdateSection = () => {
-    flushActiveSection();
-    toast.info('Chỉ hiển thị giao diện — chưa lưu dữ liệu ngân hàng câu hỏi.');
-  };
-
-  const handleQuestionsFullyRestored = (tempId, nextSection) => {
-    handleSectionChange(tempId, nextSection);
-  };
-
   const handlePathSelect = (nextPathId) => {
     if (String(nextPathId) === String(pathId)) return;
-    const nextPath = coursePaths.find((p) => String(p.PathId) === String(nextPathId));
     navigate(`/mentor/question-banks/${courseId}/${nextPathId}`, {
       replace: true,
-      state: {
-        ...navState,
-        pathName: nextPath?.PathName,
-        pathOrder: nextPath?.Order,
-      },
+      state: navState,
     });
   };
 
   const handleBack = () => {
     navigate(`/mentor/question-banks/${courseId}`);
-  };
+  }
 
   if (!courseId || !pathId) {
     return (
@@ -159,21 +78,41 @@ export default function MentorQuestionBankManagePage() {
       </Box>
     );
   }
+  //___Stat in question bank skill nav
+  const [statsForSkillNav, setStatsForSkillNav] = useState([])
+  useEffect(() => {
+    (async () => {
+      const resPaths = await axios.get(
+        `http://localhost:5000/api/questionBank/courses/${courseId}/active-stats`,
+      );
+      setStatsForSkillNav(resPaths.data.data.chapters);
+    })();
+  }, [courseId]);
+  //__Number question in path's question bank
+  const questionCount = statsForSkillNav?.filter((statChapter) => Number(statChapter.PathId) === Number(pathId))[0]?.totalActive
+  // list section use for test follow of skills
+  const sectionUseForTest = (statsForSkillNav, pathId) => {
+    const statOfPath = statsForSkillNav.filter((stat) => Number(stat.PathId) === Number(pathId))
+    return statOfPath.map((stat) => ({
+      PathId: stat.PathId,
+      LISTENING: stat.listeningSectionGroups.filter((section) => section.isUseForTest === true),
+      READING: stat.readingSectionGroups.filter((section) => section.isUseForTest === true),
+      VOCABULARY: stat.vocabularySectionGroups.filter((section) => section.isUseForTest === true),
+    }))
+  }
 
   return (
     <Box sx={{ width: '100%', maxWidth: { xs: '100%', lg: 1520 }, mx: 'auto' }}>
       <MentorQuestionBankDetailHeader
         isCreateMode
         breadcrumbMode="coursePath"
-        bankTitle={bankTitle}
+        bankTitle={course.PathName}
         courseId={courseId}
         courseName={course.CourseName}
         coursePublished={Boolean(course.IsPublished)}
         totalQuestionCount={questionCount}
-        questionCountBySkill={questionCountBySkill}
         onBack={handleBack}
       />
-
       <Box
         sx={{
           display: 'flex',
@@ -183,10 +122,11 @@ export default function MentorQuestionBankManagePage() {
         }}
       >
         <MentorQuestionBankSkillNav
-          sections={sections}
+          pathId={pathId}
+          statsForSkillNav={statsForSkillNav}
           activeSkill={activeSkill}
           sectionErrors={sectionErrors}
-          chapterQuizConfig={null}
+          sectionUseForTest={sectionUseForTest(statsForSkillNav, pathId)}
           onSkillChange={handleSkillSelect}
         />
 
@@ -201,32 +141,7 @@ export default function MentorQuestionBankManagePage() {
             alignItems: 'start',
           }}
         >
-          <MentorQuestionBankBuilderPanel
-            sections={sections}
-            activeSkill={activeSkill}
-            activeSection={activeSection}
-            activeSectionIndex={activeSectionIndex}
-            activeSectionId={activeSectionId}
-            skillSections={skillSections}
-            skillSectionsAllCount={skillSectionsAll.length}
-            sectionUseForTestFilter={sectionUseForTestFilter}
-            sectionUseForTestCounts={sectionUseForTestCounts}
-            onSectionUseForTestFilterChange={setSectionUseForTestFilter}
-            sectionErrors={sectionErrors}
-            sectionBaselines={sectionBaselines}
-            sectionSourceBaselines={sectionSourceBaselines}
-            activeSectionDirty={false}
-            updatingSection={updatingSectionId === activeSectionId}
-            questionCount={questionCount}
-            coursePublished={Boolean(course.IsPublished)}
-            chapterQuizConfig={null}
-            onSectionSelect={handleSectionSelect}
-            onAddBai={handleAddBai}
-            onSectionChange={handleSectionChange}
-            onQuestionsFullyRestored={handleQuestionsFullyRestored}
-            onUpdateSection={handleUpdateSection}
-            onRegisterSectionControls={bindSectionControls}
-          />
+          <MentorQuestionBankBuilderPanel />
 
           <MentorQuestionBankOutlinePanel
             sections={sections}
@@ -236,7 +151,7 @@ export default function MentorQuestionBankManagePage() {
             onNavigateToItem={handleOutlineNavigate}
             courseName={course.CourseName}
             courseCategory={courseCategory}
-            chapterTitle={bankTitle}
+            chapterTitle={course.PathName}
             courseChapters={coursePaths}
             selectedChapterId={pathId}
             courseId={courseId}

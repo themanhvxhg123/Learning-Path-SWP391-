@@ -20,12 +20,8 @@ import {
   TEST_SKILL_LABELS,
   TEST_SKILL_LISTENING,
   TEST_SKILL_READING,
-  TEST_SKILL_VOCABULARY,
   QUESTION_BANK_SKILLS,
-  normalizeQuestionBankSkillType,
-  isQuestionBankVocabularySkill,
 } from '@/features/mentor/utils/mentorTestContentUtils';
-import { getSectionDisplayQuestionCount } from '@/features/mentor/utils/questionBankApiMappers';
 import { getSkillTestUsageLabel } from '@/features/mentor/utils/mentorChapterQuizConfigUtils';
 
 const SKILL_NAV_ITEMS = QUESTION_BANK_SKILLS.map((skill) => ({
@@ -39,13 +35,13 @@ const SKILL_NAV_ITEMS = QUESTION_BANK_SKILLS.map((skill) => ({
 }));
 
 function SkillNavButton({
+  skill,
+  numberQuestionInSkill,
+  numberSectionInSkill,
   label,
   icon: Icon,
   color,
-  sectionCount = 0,
-  sectionUnit = 'bài',
-  questionCount = 0,
-  testUsageLabel = null,
+  sectionUseForTest = [],
   selected = false,
   disabled = false,
   hasError = false,
@@ -97,11 +93,11 @@ function SkillNavButton({
           {label}
         </Typography>
         <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.15, lineHeight: 1.35 }}>
-          {sectionCount} {sectionUnit} · {questionCount} câu hỏi
+          {numberSectionInSkill ?? 0} section : {numberQuestionInSkill} câu
         </Typography>
-        {testUsageLabel ? (
+        {sectionUseForTest ? (
           <Typography sx={{ fontSize: 11, color: '#047857', mt: 0.2, lineHeight: 1.35, fontWeight: 600 }}>
-            {testUsageLabel}
+            {sectionUseForTest[0]?.[skill]?.length} section dùng trong question bank
           </Typography>
         ) : null}
       </Box>
@@ -110,26 +106,31 @@ function SkillNavButton({
 }
 
 export default function MentorQuestionBankSkillNav({
+  pathId,
+  statsForSkillNav = [],
   sections = [],
   activeSkill,
   disabled = false,
   sectionErrors = {},
-  chapterQuizConfig = null,
+  sectionUseForTest = null,
   onSkillChange,
 }) {
-  // Đếm số bài/nhóm và số câu hỏi theo từng kỹ năng
-  const baiCountBySkill = SKILL_NAV_ITEMS.reduce((acc, { skill }) => {
-    acc[skill] = getSectionsBySkill(sections, skill).length;
-    return acc;
-  }, {});
 
-  const countBySkill = SKILL_NAV_ITEMS.reduce((acc, { skill }) => {
-    acc[skill] = getSectionsBySkill(sections, skill).reduce(
-      (sum, section) => sum + getSectionDisplayQuestionCount(section),
-      0,
-    );
-    return acc;
-  }, {});
+  const normalizationSkill = (skill) => {
+    if (skill.toLowerCase() === 'listening') return 'listeningSectionGroups';
+    if (skill.toLowerCase() === 'reading') return 'readingSectionGroups';
+    if (skill.toLowerCase() === 'vocabulary') return 'vocabularySectionGroups';
+    return ''
+  }
+
+  const countSectionInSkill = (statsForSkillNav, pathId, skill) => {
+    skill = normalizationSkill(skill)
+    return statsForSkillNav.filter((stat) => Number(stat.PathId) === Number(pathId))[0]?.[skill]?.length
+  }
+
+  const countQuestionInSkill = (statsForSkillNav, pathId, skill) => {
+    return statsForSkillNav.filter((stat) => Number(stat.PathId) === Number(pathId))[0]?.questionCountBySkill?.[skill]
+  }
 
   const errorBySkill = SKILL_NAV_ITEMS.reduce((acc, { skill }) => {
     acc[skill] = getSectionsBySkill(sections, skill).some((section) =>
@@ -166,16 +167,19 @@ export default function MentorQuestionBankSkillNav({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
           {SKILL_NAV_ITEMS.map(({ skill, label, icon }) => {
             const theme = TEST_SKILL_CHIP_COLORS[skill];
+            const numberSectionInSkill = countSectionInSkill(statsForSkillNav, pathId, skill)
+            const numberQuestionInSkill = countQuestionInSkill(statsForSkillNav, pathId, skill)
             return (
               <SkillNavButton
                 key={skill}
+                skill={skill}
+                pathId={pathId}
                 label={label}
                 icon={icon}
                 color={theme.color}
-                sectionCount={baiCountBySkill[skill]}
-                sectionUnit={skill === TEST_SKILL_VOCABULARY ? 'nhóm' : 'bài'}
-                questionCount={countBySkill[skill]}
-                testUsageLabel={getSkillTestUsageLabel(skill, chapterQuizConfig)}
+                numberSectionInSkill={numberSectionInSkill}
+                numberQuestionInSkill={numberQuestionInSkill}
+                sectionUseForTest={sectionUseForTest}
                 selected={activeSkill === skill}
                 disabled={disabled}
                 hasError={errorBySkill[skill]}

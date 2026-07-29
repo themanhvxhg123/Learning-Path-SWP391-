@@ -18,6 +18,7 @@ const mentorRoutes = require('./routes/mentorRoutes');
 const materialsRoutes = require('./routes/materialsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const newsRoutes = require('./routes/newsRoutes');
+const questionBankRoutes = require('./routes/questionBankRoutes')
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -42,6 +43,8 @@ app.use('/api/materials', materialsRoutes);
 app.use('/api', lookupRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/news', newsRoutes);
+// ----- Routes Question Bank
+app.use('/api/questionBank', questionBankRoutes);
 // Link URL Courses's Avatar
 // Static: serve course avatars
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));

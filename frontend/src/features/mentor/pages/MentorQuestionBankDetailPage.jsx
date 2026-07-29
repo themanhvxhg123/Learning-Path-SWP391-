@@ -19,94 +19,81 @@ import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, alpha, useTheme } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
-import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AppButton from '@/shared/ui/AppButton';
-import EmptyState from '@/shared/ui/EmptyState';
 import { toast } from '@/shared/ui/Toast';
-import ScrollToTopButton from '@/shared/ui/ScrollToTopButton';
-import MentorQuestionBankBuilderPanel from '@/features/mentor/components/questionBank/MentorQuestionBankBuilderPanel';
-import MentorQuestionBankDetailHeader from '@/features/mentor/components/questionBank/MentorQuestionBankDetailHeader';
-import MentorQuestionBankOutlinePanel from '@/features/mentor/components/questionBank/MentorQuestionBankOutlinePanel';
-import MentorQuestionBankSkillNav from '@/features/mentor/components/questionBank/MentorQuestionBankSkillNav';
-import useQuestionBankEditorUi from '@/features/mentor/hooks/useQuestionBankEditorUi';
 import { PRIMARY, MUTED, TEXT } from '@/features/mentor/components/course/mentorCourseCreateStyles';
-import {
-  countActiveQuestionsBySkill,
-  getFilledQuestionCount,
-} from '@/features/mentor/utils/mentorTestContentUtils';
-import { formatMentorCourseDate } from '@/features/mentor/utils/mentorCourseUtils';
+import questionBankService from '@/features/mentor/services/questionBankService';
+import axios from 'axios';
 
 /** Chỉnh demo khóa học + chương tại đây (theo courseId) */
-const MOCK_COURSES_BY_ID = {
-  1: {
-    CourseId: 1,
-    CourseName: 'Tiếng Anh Thương Mại & Giao Tiếp Công Sở',
-    IsPublished: 1,
-    CategoryDisplayName: 'Tiếng Anh thương mại',
-    LevelDisplayName: 'Trung cấp',
-    CourseUpdateAt: '2026-03-18T10:30:00.000Z',
-  },
-  2: {
-    CourseId: 2,
-    CourseName: 'IELTS Band 6.5 – Luyện thi Toàn diện',
-    IsPublished: 1,
-    CategoryDisplayName: 'Luyện thi',
-    LevelDisplayName: 'Nâng cao',
-    CourseUpdateAt: '2026-04-02T14:15:00.000Z',
-  },
-  3: {
-    CourseId: 3,
-    CourseName: 'Tiếng Anh Giao Tiếp Đời Sống Hằng Ngày',
-    IsPublished: 1,
-    CategoryDisplayName: 'Giao tiếp',
-    LevelDisplayName: 'Cơ bản',
-    CourseUpdateAt: '2026-02-10T09:00:00.000Z',
-  },
-};
+//   1: {
+//     CourseId: 1,
+//     CourseName: 'Tiếng Anh Thương Mại & Giao Tiếp Công Sở',
+//     IsPublished: 1,
+//     CategoryDisplayName: 'Tiếng Anh thương mại',
+//     LevelDisplayName: 'Trung cấp',
+//     CourseUpdateAt: '2026-03-18T10:30:00.000Z',
+//   },
+//   2: {
+//     CourseId: 2,
+//     CourseName: 'IELTS Band 6.5 – Luyện thi Toàn diện',
+//     IsPublished: 1,
+//     CategoryDisplayName: 'Luyện thi',
+//     LevelDisplayName: 'Nâng cao',
+//     CourseUpdateAt: '2026-04-02T14:15:00.000Z',
+//   },
+//   3: {
+//     CourseId: 3,
+//     CourseName: 'Tiếng Anh Giao Tiếp Đời Sống Hằng Ngày',
+//     IsPublished: 1,
+//     CategoryDisplayName: 'Giao tiếp',
+//     LevelDisplayName: 'Cơ bản',
+//     CourseUpdateAt: '2026-02-10T09:00:00.000Z',
+//   },
+// };
 
-const MOCK_CHAPTERS_BY_COURSE_ID = {
-  1: [
-    {
-      PathId: 1,
-      PathName: 'Khởi động & Làm quen thuật ngữ',
-      Order: 1,
-      Nodes: [{ NodeId: 101, NodeName: 'Chào hỏi công sở', NodeOrder: 1 }],
-    },
-    {
-      PathId: 2,
-      PathName: 'Kỹ năng viết Email chuyên nghiệp',
-      Order: 2,
-      Nodes: [{ NodeId: 201, NodeName: 'Cấu trúc email', NodeOrder: 1 }],
-    },
-  ],
-  3: [
-    {
-      PathId: 1,
-      PathName: 'Chào hỏi & Giới thiệu bản thân',
-      Order: 1,
-      Nodes: [{ NodeId: 301, NodeName: 'Hello & Hi', NodeOrder: 1 }],
-    },
-    {
-      PathId: 2,
-      PathName: 'Mua sắm & Hỏi giá',
-      Order: 2,
-      Nodes: [{ NodeId: 302, NodeName: 'How much is it?', NodeOrder: 1 }],
-    },
-    {
-      PathId: 3,
-      PathName: 'Nhà hàng & Gọi món',
-      Order: 3,
-      Nodes: [{ NodeId: 303, NodeName: 'Can I have the menu?', NodeOrder: 1 }],
-    },
-  ],
-};
+// const MOCK_CHAPTERS_BY_COURSE_ID = {
+//   1: [
+//     {
+//       PathId: 1,
+//       PathName: 'Khởi động & Làm quen thuật ngữ',
+//       Order: 1,
+//       Nodes: [{ NodeId: 101, NodeName: 'Chào hỏi công sở', NodeOrder: 1 }],
+//     },
+//     {
+//       PathId: 2,
+//       PathName: 'Kỹ năng viết Email chuyên nghiệp',
+//       Order: 2,
+//       Nodes: [{ NodeId: 201, NodeName: 'Cấu trúc email', NodeOrder: 1 }],
+//     },
+//   ],
+//   3: [
+//     {
+//       PathId: 1,
+//       PathName: 'Chào hỏi & Giới thiệu bản thân',
+//       Order: 1,
+//       Nodes: [{ NodeId: 301, NodeName: 'Hello & Hi', NodeOrder: 1 }],
+//     },
+//     {
+//       PathId: 2,
+//       PathName: 'Mua sắm & Hỏi giá',
+//       Order: 2,
+//       Nodes: [{ NodeId: 302, NodeName: 'How much is it?', NodeOrder: 1 }],
+//     },
+//     {
+//       PathId: 3,
+//       PathName: 'Nhà hàng & Gọi món',
+//       Order: 3,
+//       Nodes: [{ NodeId: 303, NodeName: 'Can I have the menu?', NodeOrder: 1 }],
+//     },
+//   ],
+// };
 
 //________Component con: thẻ hiển thị một chương trong danh sách__________
 // Trigger click → gọi onOpen(path) để parent navigate sang trang workspace
-function PathChapterCard({ path, index, onOpen, stats, statsLoaded = false }) {
+function PathChapterCard({ path, onOpen, stats, statsLoaded = false }) {
   const theme = useTheme();
   const listeningSectionCount = stats?.listeningSectionGroups?.length ?? 0;
   const readingSectionCount = stats?.readingSectionGroups?.length ?? 0;
@@ -225,7 +212,6 @@ function PathChapterCard({ path, index, onOpen, stats, statsLoaded = false }) {
 export default function MentorQuestionBankDetailPage() {
   const navigate = useNavigate();
   const { courseId } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   // ===== STATE =====
   // course: thông tin khóa học từ API
@@ -235,133 +221,79 @@ export default function MentorQuestionBankDetailPage() {
   const [chapterStatsByPathId, setChapterStatsByPathId] = useState({});
   const [statsLoaded, setStatsLoaded] = useState(false);
 
-  // ===== Dữ liệu demo (giao diện) =====
+  // ==========
   useEffect(() => {
-    const mockCourse = MOCK_COURSES_BY_ID[Number(courseId)];
-    setCourse(
-      mockCourse ?? {
-        CourseId: courseId,
-        CourseName: `Khóa học #${courseId}`,
-        IsPublished: true,
-      },
-    );
-    setCoursePaths(MOCK_CHAPTERS_BY_COURSE_ID[Number(courseId)] ?? []);
-    setChapterStatsByPathId({});
-    setStatsLoaded(true);
+    const fetchCourse = async () => {
+      const user = JSON.parse(localStorage.getItem("user"))
+      const reCourses = await axios.get(`http://localhost:5000/api/courses/my-courses/${courseId}?tab=course`,
+        {
+          headers: {
+            "x-user-id": user.userId
+          }
+        })
+      setCourse(reCourses.data.data[0])
+      setCoursePaths(reCourses.data.data[0].Paths)
+    }
+    fetchCourse()
   }, [courseId]);
 
-  const chapterId = searchParams.get('chapterId') ?? '';
-  // const isEditorMode = searchParams.get('mode') === 'editor';
-  // const isPathListMode = !chapterId;
+  // Sau khi biết đang xem khóa học nào (courseId), tải thống kê ngân hàng câu hỏi theo từng chương.
+  useEffect(() => {
+    // Chưa có mã khóa học trên đường dẫn → không gọi server, thoát sớm.
+    if (!courseId) return undefined;
 
-  // const course = getMockCourseFromQuestionBank(courseId);
-  const courseChapters = MOCK_CHAPTERS_BY_COURSE_ID[Number(courseId)] ?? [];
-  const selectedChapter = courseChapters.find(
-    (item) => String(item.PathId) === String(chapterId),
-  );
+    // Cờ “đã hủy”: nếu mentor chuyển sang khóa khác trước khi server trả lời, bỏ qua kết quả cũ (tránh hiển thị nhầm khóa).
+    let cancelled = false;
 
-  // const bank = useMemo(
-  //   () => ({
-  //     id: questionBankId,
-  //     courseId: Number(courseId) || courseId,
-  //     courseTitle: course?.CourseName ?? `Khóa học #${courseId}`,
-  //     chapterId: chapterId ? Number(chapterId) : null,
-  //     PathName: selectedChapter?.PathName ?? '',
-  //     title: selectedChapter?.PathName ?? 'Ngân hàng câu hỏi',
-  //     updatedAt: course?.CourseUpdateAt,
-  //   }),
-  //   [questionBankId, courseId, course, chapterId, selectedChapter],
-  // );
+    // Bắt đầu tải lại: ẩn số liệu cũ và báo UI là “đang chờ thống kê”.
+    setStatsLoaded(false);
+    setChapterStatsByPathId({});
 
-  const bankPaths = useMemo(
-    () =>
-      courseChapters.map((path, index) => ({
-        ...path,
-        displayLabel: `Chương ${path.Order ?? index + 1}: ${path.PathName}`,
-        QuestionCount: 0,
-      })),
-    [courseChapters],
-  );
+    // Hàm bất đồng bộ: gọi API trong nền, không chặn màn hình.
+    (async () => {
+      // Lấy thống kê cả khóa (mỗi chương: số bài nghe/đọc/từ vựng, v.v.).
+      const coureQuestionBankActiveStats = await questionBankService.getCourseQuestionBankActiveStats(courseId);
 
-  const workspaceKey = `${courseId}-${chapterId || 'none'}`;
+      // Mentor đã rời khóa này → không cập nhật state nữa.
+      if (cancelled) return;
 
-  const {
-    sections,
-    sectionErrors,
-    activeSkill,
-    activeSection,
-    activeSectionIndex,
-    skillSections,
-    activeSectionId,
-    handleSectionChange,
-    handleSkillSelect,
-    handleSectionSelect,
-    handleAddBai,
-    handleOutlineNavigate,
-  } = useQuestionBankEditorUi({ resetKey: chapterId || null });
+      // Gom danh sách chương từ server: mã chương → thống kê của chương đó (để mỗi thẻ chương tra nhanh).
+      const byPathId = {};
+      for (const chapter of coureQuestionBankActiveStats.chapters ?? []) {
+        byPathId[String(chapter.PathId)] = chapter;
+      }
 
-  const questionCount = useMemo(() => getFilledQuestionCount(sections), [sections]);
+      // Lưu thống kê lên màn hình; đánh dấu đã tải xong để thẻ chương hiện đúng (kể cả “chưa có câu hỏi”).
+      setChapterStatsByPathId(byPathId);
+      setStatsLoaded(true);
 
-  const questionCountBySkill = useMemo(
-    () => countActiveQuestionsBySkill(sections),
-    [sections],
-  );
+      // Server báo lỗi → hiện thông báo đỏ cho mentor.
+      if (!coureQuestionBankActiveStats.ok && coureQuestionBankActiveStats.message) {
+        toast.error(coureQuestionBankActiveStats.message);
+      }
+    })();
 
-  const courseCategory = useMemo(
-    () => [course?.CategoryDisplayName, course?.LevelDisplayName].filter(Boolean).join(' · '),
-    [course],
-  );
+    // Dọn dẹp khi courseId đổi hoặc rời trang: các lần gọi API cũ sẽ bị bỏ qua nhờ cancelled = true.
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]); // Chạy lại mỗi khi mentor mở khóa học khác trên URL.
+
 
   // Handler: click thẻ chương → chuyển sang workspace chỉnh sửa câu hỏi
   const openPath = (path) => {
     navigate(`/mentor/question-banks/${courseId}/${path.PathId}`, {
       state: {
-        courseName: course?.CourseName,
-        pathName: path.PathName,
-        pathOrder: path.Order,
-        coursePublished: course?.IsPublished,
-        categoryName: course?.CategoryDisplayName ?? course?.categoryName,
-        levelName: course?.LevelDisplayName ?? course?.levelName,
+        CourseName: course?.CourseName,
+        PathName: path.PathName,
+        PathOrder: path.Order,
+        IsPublished: course?.IsPublished,
+        CategoryDisplayName: course?.CategoryDisplayName,
+        LevelDisplayName: course?.LevelDisplayName,
       },
     });
   };
 
-  const selectChapter = (nextChapterId) => {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set('courseId', courseId);
-        next.set('chapterId', String(nextChapterId));
-        next.set('mode', 'editor');
-        return next;
-      },
-      { replace: true },
-    );
-  };
-
-  const handleSubmit = () => {
-    toast.info('Logic lưu question bank sẽ được implement lại.');
-  };
-
-  const footerActions = (
-    <AppButton
-      startIcon={<SaveOutlinedIcon />}
-      onClick={handleSubmit}
-      fullWidth
-      sx={{
-        height: 44,
-        fontSize: 14,
-        fontWeight: 700,
-        borderRadius: '999px',
-        bgcolor: PRIMARY,
-        color: '#fff',
-        boxShadow: 'none',
-        '&:hover': { bgcolor: '#0E7490', boxShadow: 'none' },
-      }}
-    >
-      Lưu ngân hàng
-    </AppButton>
-  );
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1280, mx: 'auto', py: 2 }}>
@@ -401,33 +333,12 @@ export default function MentorQuestionBankDetailPage() {
           {course?.CourseName ?? 'Đang tải khóa học...'}
         </Typography>
         <Typography sx={{ fontSize: 14, color: MUTED }}>
-          {/* {courseCategory ? `${courseCategory} · ` : ''}
-          {bankPaths.length} chương · {totalQuestions} câu hỏi
-          {bank.updatedAt ? ` · Cập nhật ${formatMentorCourseDate(bank.updatedAt)}` : ''} */}
         </Typography>
         <Typography sx={{ fontSize: 13, color: MUTED, mt: 1 }}>
           Chọn chương để quản lý câu hỏi
         </Typography>
       </Box>
 
-      {/* <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <AppButton
-          onClick={() => navigate(`/mentor/question-banks/manage?courseId=${courseId}`)}
-          sx={{ height: 40, borderRadius: '999px', bgcolor: PRIMARY, boxShadow: 'none' }}
-        >
-          Thêm chương
-        </AppButton>
-      </Box> */}
-
-      {/* {bankPaths.length === 0 ? (
-        <EmptyState
-          icon={MenuBookOutlinedIcon}
-          title="Chưa có chương nào trong ngân hàng"
-          description="Tạo ngân hàng câu hỏi cho một chương để bắt đầu."
-          actionLabel="Thêm chương"
-          onAction={() => navigate(`/mentor/question-banks/manage?courseId=${courseId}`)}
-        />
-      ) : ( */}
       {/* Grid danh sách chương — click để mở workspace */}
       <Box
         sx={{
@@ -447,7 +358,6 @@ export default function MentorQuestionBankDetailPage() {
           />
         ))}
       </Box>
-      {/* )} */}
     </Box>
   );
 

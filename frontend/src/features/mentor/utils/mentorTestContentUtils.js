@@ -70,7 +70,11 @@ export const QUESTION_BANK_SKILLS = [
 ];
 
 /** @deprecated Dùng QUESTION_BANK_SKILLS cho ngân hàng câu hỏi. */
-export const TEST_SKILLS = QUESTION_BANK_SKILLS;
+export const TEST_SKILLS = [
+  TEST_SKILL_LISTENING,
+  TEST_SKILL_READING,
+  TEST_SKILL_VOCABULARY,
+];
 
 export const TEST_SKILL_LABELS = {
   [TEST_SKILL_LISTENING]: 'Nghe',

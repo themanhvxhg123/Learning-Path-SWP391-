@@ -1,9 +1,10 @@
 const { sql } = require('../config/db');
 const {
-    normalizeSectionSkillType,
+    TYPE_ID_TO_SKILL,
     SQL_SKILL_TYPE_FROM_TYPE_ID,
 } = require('../utils/sectionSkillType');
 
+const questionBankService = require('../services/questionBankService');
 
 
 const getAllListQuestionBankByMentorId = async (mentorId) => {
@@ -64,156 +65,67 @@ const getAllListQuestionBankByMentorId = async (mentorId) => {
 
 };
 
+// normalization data from sql return at function getAllQuestionOfPathModel
+// const normalizationDataGetAllQuestionPathModel
 
-
-const getSectionsByPath = async (courseId, pathId) => {
-    const request = new sql.Request();
-    request.input('courseId', sql.Int, Number(courseId));
-    request.input('pathId', sql.Int, Number(pathId));
-    const result = await request.query(`
-        SELECT
-            qp.Question_Path_Id AS QuestionPathId,
-            qs.SectionId,
-            qs.SectionName,
-            qs.Title,
-            qs.TypeId,
-            ${SQL_SKILL_TYPE_FROM_TYPE_ID} AS SkillType,
-            qs.[Order] AS SectionOrder,
-            qs.SourceUrl,
-            qs.IsUseForTest,
-            COUNT(q.QuestionId) AS QuestionCount
-
-        FROM dbo.Questions_Path qp
-        INNER JOIN dbo.Question_Bank qb
-            ON qb.BankId = qp.BankId
-        INNER JOIN dbo.Question_Sections qs
-            ON qs.Question_Path_Id = qp.Question_Path_Id
-        INNER JOIN dbo.Section_Type st
-            ON st.TypeId = qs.TypeId
-        LEFT JOIN dbo.Questions q
-            ON q.SectionId = qs.SectionId
-           AND q.IsActive = 1
-        WHERE qp.PathId = @pathId
-          AND qb.CourseId = @courseId
-        GROUP BY
-            qp.Question_Path_Id,
-            qs.SectionId,
-            qs.SectionName,
-            qs.Title,
-            qs.TypeId,
-            qs.[Order],
-            qs.SourceUrl,
-            qs.IsUseForTest
-        ORDER BY qs.[Order], qs.SectionId
-    `);
-    return result.recordset;
-};
-
-
-
-const getQuestionsBySection = async (sectionId) => {
-    const request = new sql.Request();
-    request.input('sectionId', sql.Int, Number(sectionId));
-    const result = await request.query(`
+// get all question of path by path's id
+const getAllSectionPathModel = async (pathId) => {
+    try {
+        const request = new sql.Request();
+        request.input('pathId', sql.Int, Number(pathId));
+        const result = await request.query(`
+SELECT
+    qs.TypeId,
+    qs.[Order],
+    qs.SectionId,
+    qs.SectionName,
+    qs.Title AS SectionTitle,
+    qs.IsUseForTest,
+    JSON_QUERY((
         SELECT
             q.QuestionId,
-            q.SectionId,
-            q.Title,
-            qs.TypeId,
-            ${SQL_SKILL_TYPE_FROM_TYPE_ID} AS SkillType,
-            qs.SourceUrl AS SourceUrl,
+            q.Title AS QuestionText,
             q.[Order] AS QuestionOrder,
-            q.IsActive,
-            q.IsUseForTest,
-            qc.ChoiceId,
-            qc.Title AS ChoiceTitle,
-            qc.[Order] AS ChoiceOrder,
-            qc.IsTrue
+            q.[IsUseForTest],
+            JSON_QUERY((
+                SELECT
+                    qc.ChoiceId,
+                    qc.Title AS ChoiceText,
+                    qc.[Order] AS ChoiceOrder,
+                    qc.IsTrue
+                FROM dbo.Question_Choices qc
+                WHERE qc.QuestionId = q.QuestionId
+                ORDER BY
+                    qc.[Order],
+                    qc.ChoiceId
+                FOR JSON PATH
+            )) AS Choices
 
         FROM dbo.Questions q
-        INNER JOIN dbo.Question_Sections qs
-            ON qs.SectionId = q.SectionId
-        INNER JOIN dbo.Section_Type st
-            ON st.TypeId = qs.TypeId
-        LEFT JOIN dbo.Question_Choices qc
-            ON qc.QuestionId = q.QuestionId
-        WHERE q.SectionId = @sectionId
-          AND q.IsActive = 1
-        ORDER BY q.[Order], q.QuestionId, qc.[Order], qc.ChoiceId
-    `);
-    return result.recordset;
-};
+        WHERE q.SectionId = qs.SectionId
+        ORDER BY
+            q.[Order],
+            q.QuestionId
+        FOR JSON PATH
+    )) AS Questions
 
+FROM dbo.Questions_Path qp
+INNER JOIN dbo.Question_Sections qs
+    ON qs.Question_Path_Id = qp.Question_Path_Id
 
+WHERE qp.PathId = @pathId
 
-const sectionBelongsToCoursePath = async (sectionId, courseId, pathId) => {
-    const request = new sql.Request();
-    request.input('sectionId', sql.Int, Number(sectionId));
-    request.input('courseId', sql.Int, Number(courseId));
-    request.input('pathId', sql.Int, Number(pathId));
-    const result = await request.query(`
-        SELECT TOP 1 qs.SectionId
-        FROM dbo.Question_Sections qs
-        INNER JOIN dbo.Questions_Path qp
-            ON qp.Question_Path_Id = qs.Question_Path_Id
-        INNER JOIN dbo.Question_Bank qb
-            ON qb.BankId = qp.BankId
-        WHERE qs.SectionId = @sectionId
-          AND qp.PathId = @pathId
-          AND qb.CourseId = @courseId
-    `);
-    return result.recordset.length > 0;
-};
-
-// get information question bank by it's id
-const getQuestionBankByIdModel = async (bankId) => {
-    const request = new sql.Request();
-    request.input("bankId", sql.Int, Number(bankId));
-    const result = await request.query(`
-        SELECT TOP (1000) [BankId]
-      ,[InstructorId]
-      ,[CourseId]
-      ,[CourseName]
-      ,[CourseDescription]
-      ,[BankDescription]
-      ,[CreatedAt]
-      ,[UpdatedAt]
-      ,[IsPublished]
-  FROM [LearningPath_Base].[dbo].[Question_Bank]
-Where BankId = @bankId
+ORDER BY
+    qs.TypeId,
+    qs.[Order],
+    qs.SectionId;
         `);
-    return result.recordset
+        return questionBankService.normalizationDataQuestionPathModel(result.recordset);
+    } catch (error) {
+        console.error(error.message);
+        return [];
+    }
 }
-
-// get question bank paths by bank's id
-const getQuestionBankPathsByBankIdModel = async (bankId) => {
-    const request = new sql.Request();
-    request.input('bankId', sql.Int, Number(bankId));
-    const result = await request.query(
-        `
-  SELECT [Question_Path_Id]
-      ,[BankId]
-      ,[PathId]
-  FROM [LearningPath_Base].[dbo].[Questions_Path]
-  Where BankId = @bankId
-        `
-    )
-
-    return result.recordset
-}
-
-const updateQuestionUseForTestById = async (questionId, isUseForTest) => {
-    const request = new sql.Request();
-    request.input('questionId', sql.Int, Number(questionId));
-    request.input('isUseForTest', sql.Bit, isUseForTest ? 1 : 0);
-    const result = await request.query(`
-        UPDATE dbo.Questions
-        SET IsUseForTest = @isUseForTest
-        WHERE QuestionId = @questionId
-          AND IsActive = 1
-    `);
-    return Number(result.rowsAffected?.[0] || 0) > 0;
-};
 
 const ACTIVE_QUESTION_WHERE = `
     q.IsActive = 1
@@ -238,9 +150,24 @@ const getChapterQuestionPathId = async (courseId, pathId) => {
     return result.recordset[0]?.QuestionPathId ?? null;
 };
 
+/**
+ * Đếm số câu hỏi "dùng được" trong bank, gom theo chương (PathId) và loại section (TypeId → skill).
+ *
+ * Input:
+ *   courseId — khóa học (lọc qua Question_Bank.CourseId)
+ *   pathId   — tùy chọn; nếu có thì chỉ đếm trong một chương, null = mọi chương của khóa
+ *
+ * Output:
+ *   recordset[] — mỗi dòng: PathId, TypeId, SkillType, ActiveCount
+ *   (ActiveCount = số câu thỏa ACTIVE_QUESTION_WHERE: active, dùng trong đề, có title)
+ *
+ * Dùng trong getChapterQuestionBankActiveStats / getCourseQuestionBankActiveStats
+ * để build questionCountBySkill (LISTENING, READING, VOCABULARY).
+ */
 const getActiveQuestionCountsByPath = async (courseId, pathId = null) => {
     const request = new sql.Request();
     request.input('courseId', sql.Int, Number(courseId));
+    // pathId null → thống kê cả khóa; có pathId → một chương
     let pathFilter = '';
     if (pathId != null) {
         request.input('pathId', sql.Int, Number(pathId));
@@ -271,31 +198,20 @@ const getActiveQuestionCountsByPath = async (courseId, pathId = null) => {
     return result.recordset;
 };
 
-const mapSectionGroupRow = (row) => {
-    const sectionTitle = String(row.Title ?? row.SectionName ?? '').trim() || 'Section';
-    return {
-        sectionTempId: `section_${row.SectionId}`,
-        sectionTitle,
-        availableCount: Number(row.ActiveCount) || 0,
-        isUseForTest: row.IsUseForTest == null ? true : Boolean(row.IsUseForTest),
-    };
-};
-
-const splitListeningReadingGroups = (rows = []) => {
-    const groups = {
-        LISTENING: [],
-        READING: [],
-    };
-
-    rows.forEach((row) => {
-        const skill = normalizeSectionSkillType(row.SkillType, row.TypeId);
-        if (!groups[skill]) return;
-        groups[skill].push(mapSectionGroupRow(row));
-    });
-
-    return groups;
-};
-
+/**
+ * Liệt kê từng section Nghe / Đọc và số câu active trong section (theo chương).
+ *
+ * Input:
+ *   courseId — khóa học
+ *   pathId   — tùy chọn; null = mọi chương, có giá trị = một chương
+ *
+ * Output:
+ *   recordset[] — mỗi section một dòng: PathId, TypeId, SkillType, SectionId,
+ *   SectionName, Title, SectionOrder, IsUseForTest, ActiveCount
+ *
+ * Chỉ TypeId IN (1, 2) — Nghe và Đọc (không gồm Từ vựng).
+ * LEFT JOIN Questions: section không có câu vẫn trả về với ActiveCount = 0.
+ */
 const getActiveListeningReadingSectionCounts = async (courseId, pathId = null) => {
     const request = new sql.Request();
     request.input('courseId', sql.Int, Number(courseId));
@@ -351,6 +267,20 @@ const getActiveListeningReadingSectionCounts = async (courseId, pathId = null) =
     return result.recordset;
 };
 
+/**
+ * Liệt kê từng section Từ vựng và số câu active trong section (theo chương).
+ *
+ * Input:
+ *   courseId — khóa học
+ *   pathId   — tùy chọn; null = mọi chương, có giá trị = một chương
+ *
+ * Output:
+ *   recordset[] — mỗi section một dòng: PathId, TypeId, SectionId,
+ *   SectionName, Title, SectionOrder, IsUseForTest, ActiveCount
+ *
+ * Chỉ qs.TypeId = 3 (Từ vựng). Cùng quy tắc đếm câu active như Nghe/Đọc.
+ * LEFT JOIN Questions: section trống vẫn có dòng, ActiveCount = 0.
+ */
 const getActiveVocabularySectionCounts = async (courseId, pathId = null) => {
     const request = new sql.Request();
     request.input('courseId', sql.Int, Number(courseId));
@@ -420,22 +350,41 @@ const getChapterQuestionBankActiveStats = async (courseId, pathId) => {
     };
 
     countRows.forEach((row) => {
-        const skill = normalizeSectionSkillType(row.SkillType, row.TypeId);
+        const skill = TYPE_ID_TO_SKILL[Number(row.TypeId)] ?? row.SkillType;
         if (skill in questionCountBySkill) {
             questionCountBySkill[skill] += Number(row.ActiveCount) || 0;
         }
     });
 
     const totalActive = Object.values(questionCountBySkill).reduce((sum, count) => sum + count, 0);
-    const lrSectionGroups = splitListeningReadingGroups(lrSectionRows);
-    const vocabularySectionGroups = vocabularyRows.map(mapSectionGroupRow);
+
+    const listeningSectionGroups = [];
+    const readingSectionGroups = [];
+    lrSectionRows.forEach((row) => {
+        const skill = TYPE_ID_TO_SKILL[Number(row.TypeId)] ?? row.SkillType;
+        const group = {
+            sectionTempId: `section_${row.SectionId}`,
+            sectionTitle: String(row.Title ?? row.SectionName ?? '').trim() || 'Section',
+            availableCount: Number(row.ActiveCount) || 0,
+            isUseForTest: row.IsUseForTest == null ? true : Boolean(row.IsUseForTest),
+        };
+        if (skill === 'LISTENING') listeningSectionGroups.push(group);
+        else if (skill === 'READING') readingSectionGroups.push(group);
+    });
+
+    const vocabularySectionGroups = vocabularyRows.map((row) => ({
+        sectionTempId: `section_${row.SectionId}`,
+        sectionTitle: String(row.Title ?? row.SectionName ?? '').trim() || 'Section',
+        availableCount: Number(row.ActiveCount) || 0,
+        isUseForTest: row.IsUseForTest == null ? true : Boolean(row.IsUseForTest),
+    }));
 
     return {
         questionPathId,
         hasBank: questionPathId != null || totalActive > 0,
         questionCountBySkill,
-        listeningSectionGroups: lrSectionGroups.LISTENING,
-        readingSectionGroups: lrSectionGroups.READING,
+        listeningSectionGroups: listeningSectionGroups,
+        readingSectionGroups: readingSectionGroups,
         vocabularySectionGroups,
         totalActive,
     };
@@ -477,7 +426,7 @@ const getCourseQuestionBankActiveStats = async (courseId) => {
             });
         }
         const bucket = countsByPath.get(pathKey);
-        const skill = normalizeSectionSkillType(row.SkillType, row.TypeId);
+        const skill = TYPE_ID_TO_SKILL[Number(row.TypeId)] ?? row.SkillType;
         if (skill in bucket) {
             bucket[skill] += Number(row.ActiveCount) || 0;
         }
@@ -489,10 +438,15 @@ const getCourseQuestionBankActiveStats = async (courseId) => {
         if (!lrGroupsByPath.has(pathKey)) {
             lrGroupsByPath.set(pathKey, { LISTENING: [], READING: [] });
         }
-        const skill = normalizeSectionSkillType(row.SkillType, row.TypeId);
+        const skill = TYPE_ID_TO_SKILL[Number(row.TypeId)] ?? row.SkillType;
         const bucket = lrGroupsByPath.get(pathKey);
         if (bucket[skill]) {
-            bucket[skill].push(mapSectionGroupRow(row));
+            bucket[skill].push({
+                sectionId: row.SectionId,
+                sectionTitle: String(row.Title ?? row.SectionName ?? '').trim() || 'Section',
+                availableCount: Number(row.ActiveCount) || 0,
+                isUseForTest: row.IsUseForTest == null ? true : Boolean(row.IsUseForTest),
+            });
         }
     });
 
@@ -502,7 +456,12 @@ const getCourseQuestionBankActiveStats = async (courseId) => {
         if (!vocabularyGroupsByPath.has(pathKey)) {
             vocabularyGroupsByPath.set(pathKey, []);
         }
-        vocabularyGroupsByPath.get(pathKey).push(mapSectionGroupRow(row));
+        vocabularyGroupsByPath.get(pathKey).push({
+            sectionTempId: `section_${row.SectionId}`,
+            sectionTitle: String(row.Title ?? row.SectionName ?? '').trim() || 'Section',
+            availableCount: Number(row.ActiveCount) || 0,
+            isUseForTest: row.IsUseForTest == null ? true : Boolean(row.IsUseForTest),
+        });
     });
 
     const chapters = pathsResult.recordset.map((row) => {
@@ -555,13 +514,7 @@ const getCourseQuestionBankActiveStats = async (courseId) => {
 
 module.exports = {
     getAllListQuestionBankByMentorId,
-    getSectionsByPath,
-    getQuestionsBySection,
-    sectionBelongsToCoursePath,
-    getQuestionBankByIdModel,
-    getQuestionBankPathsByBankIdModel,
-    updateQuestionUseForTestById,
     getChapterQuestionBankActiveStats,
     getCourseQuestionBankActiveStats,
+    getAllSectionPathModel
 };
-
