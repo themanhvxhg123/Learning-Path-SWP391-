@@ -80,14 +80,18 @@ export default function MentorQuestionBankManagePage() {
   }
   //___Stat in question bank skill nav
   const [statsForSkillNav, setStatsForSkillNav] = useState([])
+  //__State for path's sections in question bank
+  const [sectionsPath, setSectionsPath] = useState([])
   useEffect(() => {
     (async () => {
-      const resPaths = await axios.get(
-        `http://localhost:5000/api/questionBank/courses/${courseId}/active-stats`,
-      );
-      setStatsForSkillNav(resPaths.data.data.chapters);
-    })();
-  }, [courseId]);
+      const [resPaths, resSectionsPath] = await Promise.all([
+        axios.get(`http://localhost:5000/api/questionBank/courses/${courseId}/active-stats`),
+        axios.get(`http://localhost:5000/api/questionBank/path/questions?pathId=${pathId}`)
+      ])
+      setStatsForSkillNav(resPaths.data.data.chapters)
+      setSectionsPath(resSectionsPath.data.pathSections)
+    })()
+  }, [courseId, pathId])
   //__Number question in path's question bank
   const questionCount = statsForSkillNav?.filter((statChapter) => Number(statChapter.PathId) === Number(pathId))[0]?.totalActive
   // list section use for test follow of skills
@@ -141,7 +145,9 @@ export default function MentorQuestionBankManagePage() {
             alignItems: 'start',
           }}
         >
-          <MentorQuestionBankBuilderPanel />
+          <MentorQuestionBankBuilderPanel
+            sectionsPath={sectionsPath}
+          />
 
           <MentorQuestionBankOutlinePanel
             sections={sections}

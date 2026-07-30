@@ -1,24 +1,102 @@
 /**
- * MentorQuestionBankBuilderPanel — cột giữa workspace (chỉ UI, chưa nối dữ liệu).
+ * MentorQuestionBankBuilderPanel — cột giữa workspace (mock section cục bộ).
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Box, Typography, alpha } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
+import MentorTestSectionCard from '@/features/mentor/components/course/MentorTestSectionCard';
 import { CREATE_CARD_SX, MUTED, PRIMARY, TEXT } from '@/features/mentor/components/course/mentorCourseCreateStyles';
 import {
+  SCORING_MODE_AUTO,
   SECTION_USE_FOR_TEST_FILTER,
   TEST_SKILL_CHIP_COLORS,
   TEST_SKILL_LISTENING,
+  TEST_SKILL_READING,
 } from '@/features/mentor/utils/mentorTestContentUtils';
 
 const DEMO_SECTION_TABS = [
-  { id: 'demo-1', label: 'Bài 1', hasContent: true },
-  { id: 'demo-2', label: 'Bài 2', hasContent: false },
+  { id: 'demo-1', label: 'Bài 1', hasContent: true, skill: TEST_SKILL_LISTENING },
+  { id: 'demo-2', label: 'Bài 2', hasContent: true, skill: TEST_SKILL_READING },
 ];
 
 const DEMO_FILTER_COUNTS = { all: 2, inTest: 1, notInTest: 1 };
+
+/** Mock section + câu hỏi — chỉ dùng trên UI builder, chưa gọi API. */
+function createMockSectionsByTab() {
+  return {
+    'demo-1': {
+      tempId: 'section_mock_listening',
+      SectionId: 9001,
+      DisplayName: 'Bài nghe 1',
+      SectionTitle: 'Office email — short dialogue',
+      SkillType: TEST_SKILL_LISTENING,
+      typeId: 1,
+      Description: '',
+      isUseForTest: true,
+      AudioUrl: 'https://example.com/audio/demo-listening.mp3',
+      Questions: [
+        {
+          tempId: 'question_mock_1',
+          QuestionId: 9101,
+          SkillType: TEST_SKILL_LISTENING,
+          QuestionText: 'What does the speaker ask the listener to do?',
+          isActive: true,
+          isUseForTest: true,
+          Options: [
+            { tempId: 'choice_mock_1', ChoiceId: 9201, OptionText: 'Reply by Friday', IsCorrect: true },
+            { tempId: 'choice_mock_2', ChoiceId: 9202, OptionText: 'Cancel the meeting', IsCorrect: false },
+            { tempId: 'choice_mock_3', ChoiceId: 9203, OptionText: 'Book a flight', IsCorrect: false },
+            { tempId: 'choice_mock_4', ChoiceId: 9204, OptionText: 'Send an invoice', IsCorrect: false },
+          ],
+        },
+        {
+          tempId: 'question_mock_2',
+          QuestionId: 9102,
+          SkillType: TEST_SKILL_LISTENING,
+          QuestionText: 'When is the follow-up meeting scheduled?',
+          isActive: true,
+          isUseForTest: true,
+          Options: [
+            { tempId: 'choice_mock_5', ChoiceId: 9205, OptionText: 'Monday at 9 AM', IsCorrect: false },
+            { tempId: 'choice_mock_6', ChoiceId: 9206, OptionText: 'Wednesday at 10 AM', IsCorrect: true },
+            { tempId: 'choice_mock_7', ChoiceId: 9207, OptionText: 'Friday at 4 PM', IsCorrect: false },
+            { tempId: 'choice_mock_8', ChoiceId: 9208, OptionText: 'Next month', IsCorrect: false },
+          ],
+        },
+      ],
+    },
+    'demo-2': {
+      tempId: 'section_mock_reading',
+      SectionId: 9002,
+      DisplayName: 'Bài đọc 1',
+      SectionTitle: 'Remote work policy (excerpt)',
+      SkillType: TEST_SKILL_READING,
+      typeId: 2,
+      Description: '<p>Employees may work remotely up to three days per week with manager approval.</p>',
+      isUseForTest: true,
+      MaterialUrl: '',
+      ReadingSourceType: 'COMPOSE',
+      Questions: [
+        {
+          tempId: 'question_mock_3',
+          QuestionId: 9103,
+          SkillType: TEST_SKILL_READING,
+          QuestionText: 'How many remote days per week are allowed?',
+          isActive: true,
+          isUseForTest: true,
+          Options: [
+            { tempId: 'choice_mock_9', ChoiceId: 9209, OptionText: 'One day', IsCorrect: false },
+            { tempId: 'choice_mock_10', ChoiceId: 9210, OptionText: 'Up to three days', IsCorrect: true },
+            { tempId: 'choice_mock_11', ChoiceId: 9211, OptionText: 'Every day', IsCorrect: false },
+            { tempId: 'choice_mock_12', ChoiceId: 9212, OptionText: 'Not mentioned', IsCorrect: false },
+          ],
+        },
+      ],
+    },
+  };
+}
 
 const SECTION_USE_FOR_TEST_FILTER_OPTIONS = [
   { value: SECTION_USE_FOR_TEST_FILTER.ALL, label: 'Tất cả', countKey: 'all' },
@@ -116,10 +194,30 @@ function SectionUseForTestFilterRow({ value, counts, onChange }) {
   );
 }
 
-export default function MentorQuestionBankBuilderPanel() {
-  const accentColor = TEST_SKILL_CHIP_COLORS[TEST_SKILL_LISTENING]?.color ?? PRIMARY;
+export default function MentorQuestionBankBuilderPanel({ sectionsPath = [] }) {
   const [sectionUseForTestFilter, setSectionUseForTestFilter] = useState(SECTION_USE_FOR_TEST_FILTER.ALL);
   const [activeTabId, setActiveTabId] = useState(DEMO_SECTION_TABS[0].id);
+  const [sectionsByTab, setSectionsByTab] = useState(createMockSectionsByTab);
+
+  const activeTab = DEMO_SECTION_TABS.find((tab) => tab.id === activeTabId) ?? DEMO_SECTION_TABS[0];
+  const activeSection = sectionsByTab[activeTabId] ?? null;
+  const accentColor =
+    TEST_SKILL_CHIP_COLORS[activeTab.skill]?.color
+    ?? TEST_SKILL_CHIP_COLORS[TEST_SKILL_LISTENING]?.color
+    ?? PRIMARY;
+
+  const allMockSections = useMemo(() => Object.values(sectionsByTab), [sectionsByTab]);
+  const questionCountAll = useMemo(
+    () => allMockSections.reduce((sum, section) => sum + (section.Questions?.length ?? 0), 0),
+    [allMockSections],
+  );
+
+  const handleSectionChange = (nextSection) => {
+    setSectionsByTab((prev) => ({
+      ...prev,
+      [activeTabId]: nextSection,
+    }));
+  };
 
   return (
     <Box id="question-bank-builder-root" sx={{ minWidth: 0, width: '100%' }}>
@@ -170,24 +268,25 @@ export default function MentorQuestionBankBuilderPanel() {
             </Typography>
           </Box>
 
-          <Box
-            sx={{
-              scrollMarginTop: 24,
-              minWidth: 0,
-              p: 3,
-              borderRadius: '16px',
-              border: '1px dashed rgba(15,23,42,0.12)',
-              bgcolor: 'rgba(15,23,42,0.02)',
-              textAlign: 'center',
-            }}
-          >
-            <Typography sx={{ fontSize: 14, fontWeight: 600, color: TEXT, mb: 0.75 }}>
-              Khu vực soạn section / câu hỏi
-            </Typography>
-            <Typography sx={{ fontSize: 13, color: MUTED, lineHeight: 1.55 }}>
-              MentorTestSectionCard và dữ liệu API sẽ được gắn lại sau.
-            </Typography>
-          </Box>
+          {activeSection ? (
+            <Box sx={{ scrollMarginTop: 24, minWidth: 0 }}>
+              <MentorTestSectionCard
+                section={activeSection}
+                index={DEMO_SECTION_TABS.findIndex((tab) => tab.id === activeTabId)}
+                accentColor={accentColor}
+                scoringMode={SCORING_MODE_AUTO}
+                totalScore={100}
+                questionCountAll={questionCountAll}
+                lockSkillType
+                questionBankMode
+                allSections={allMockSections}
+                coursePublished={false}
+                chapterQuizConfig={null}
+                defaultExpanded
+                onChange={handleSectionChange}
+              />
+            </Box>
+          ) : null}
         </Box>
       </Box>
     </Box>
