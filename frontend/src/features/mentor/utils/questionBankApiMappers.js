@@ -42,7 +42,12 @@ function toBooleanDefaultTrue(value) {
 }
 
 function resolveSectionSourceUrlFromApi(apiSection = {}) {
-  const raw = apiSection.sourceUrl ?? apiSection.audioUrl ?? apiSection.materialUrl ?? '';
+  const raw =
+    apiSection.SourceUrl
+    ?? apiSection.sourceUrl
+    ?? apiSection.audioUrl
+    ?? apiSection.materialUrl
+    ?? '';
   return String(raw).trim();
 }
 
@@ -114,9 +119,13 @@ export function mapApiSectionToEditorSection(apiSection) {
 
 /** Tải HTML bài đọc từ SourceUrl/MaterialUrl (Cloudinary) vào Description để hiển thị preview. */
 export async function hydrateReadingSectionFromSourceUrl(section) {
-  if (section?.SkillType !== TEST_SKILL_READING) return section;
+  const isReading =
+    section?.SkillType === TEST_SKILL_READING || Number(section?.TypeId) === 2;
+  if (!isReading) return section;
 
-  const materialUrl = String(section.MaterialUrl ?? '').trim();
+  const materialUrl = String(
+    section.MaterialUrl ?? section.SourceUrl ?? '',
+  ).trim();
   if (!materialUrl) return section;
   if (!isHtmlContentEmpty(section.Description)) return section;
 
@@ -132,6 +141,55 @@ export async function hydrateReadingSectionFromSourceUrl(section) {
   } catch {
     return section;
   }
+}
+
+/** API path/questions trả SourceUrl — editor nghe/đọc dùng field khác. */
+export function mapPathSectionFromApi(section = {}) {
+  const sourceUrl = resolveSectionSourceUrlFromApi(section);
+  const typeId = Number(section.TypeId);
+  const next = {
+    ...section,
+    tempId: section.tempId ?? `section_${section.SectionId}`,
+    sectionOrder: Number(section.Order ?? section.sectionOrder) || 0,
+    // Questions: id ổn định cho mục lục + scroll
+    Questions: (section.Questions ?? []).map((question) => ({
+      ...question,
+      tempId: question.tempId ?? `question_${question.QuestionId}`,
+    })),
+  };
+
+  const skillByTypeId = {
+    1: TEST_SKILL_LISTENING,
+    2: TEST_SKILL_READING,
+    3: TEST_SKILL_VOCABULARY,
+  };
+  if (skillByTypeId[typeId]) {
+    next.SkillType = skillByTypeId[typeId];
+  }
+
+  if (typeId === 1 && sourceUrl) {
+    next.AudioUrl = sourceUrl;
+    next.AudioSourceType = LISTENING_SOURCE_LINK;
+  }
+
+  if (typeId === 2 && sourceUrl) {
+    next.MaterialUrl = sourceUrl;
+    next.SkillType = TEST_SKILL_READING;
+    next.ReadingSourceType = READING_SOURCE_UPLOAD;
+  }
+
+  const useForTestRaw = section.IsUseForTest ?? section.isUseForTest;
+  const useForTestOn = useForTestRaw == null ? true : useForTestRaw !== false && useForTestRaw !== 0;
+  next.isUseForTest = useForTestOn;
+  next.IsUseForTest = useForTestOn;
+
+  return next;
+}
+
+/** Map + tải nội dung bài đọc để preview trong editor. */
+export async function loadPathSectionsForEditor(pathSections = []) {
+  const mapped = pathSections.map(mapPathSectionFromApi);
+  return Promise.all(mapped.map((section) => hydrateReadingSectionFromSourceUrl(section)));
 }
 
 /** Chuyển object question từ API sang format editor. */

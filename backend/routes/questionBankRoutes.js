@@ -8,4 +8,7 @@ router.get('/getAllListQuestionBank', questionBankController.getAllListQuestionB
 router.get('/courses/:courseId/active-stats', questionBankController.getCourseQuestionBankActiveStatsController);
 
 router.get('/path/questions', questionBankController.getAllQuestionOfPathController);
+
+router.post('/section/updateStatus', questionBankController.updateStatusSectionController);
+router.post('/question/updateStatus', questionBankController.updateStatusQuestionController);
 module.exports = router

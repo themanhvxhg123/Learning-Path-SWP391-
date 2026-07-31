@@ -12,9 +12,22 @@ import MentorQuestionBankDetailHeader from '@/features/mentor/components/questio
 import MentorQuestionBankOutlinePanel from '@/features/mentor/components/questionBank/MentorQuestionBankOutlinePanel';
 import MentorQuestionBankSkillNav from '@/features/mentor/components/questionBank/MentorQuestionBankSkillNav';
 import useQuestionBankEditorUi from '@/features/mentor/hooks/useQuestionBankEditorUi';
+
+// TypeId API (1/2/3) → skill constant cho mục lục
+const SKILL_BY_TYPE_ID = {
+  1: TEST_SKILL_LISTENING,
+  2: TEST_SKILL_READING,
+  3: TEST_SKILL_VOCABULARY,
+};
 import {
   SECTION_USE_FOR_TEST_FILTER,
+  SKILL_TO_TYPE_ID,
+  TEST_SKILL_LISTENING,
+  TEST_SKILL_READING,
+  TEST_SKILL_VOCABULARY,
+  scrollToQuestionBankItem,
 } from '@/features/mentor/utils/mentorTestContentUtils';
+import { loadPathSectionsForEditor } from '@/features/mentor/utils/questionBankApiMappers';
 import axios from 'axios';
 
 export default function MentorQuestionBankManagePage() {
@@ -22,6 +35,11 @@ export default function MentorQuestionBankManagePage() {
   const location = useLocation();
   const { courseId, pathId } = useParams();
   const navState = location.state ?? {};
+  //__State selected Section
+  const [selectedSectionId, setSelectedSectionId] = useState(0);
+  const [selectedSkillId, setSelectedSkillId] = useState(1)
+  //__State to filter section is used for test or not used for test
+  const [sectionIsUseForTest, setSectionIsUseForTest] = useState(SECTION_USE_FOR_TEST_FILTER.ALL)
   const course = useMemo(
     () => ({
       CourseId: courseId,
@@ -49,16 +67,8 @@ export default function MentorQuestionBankManagePage() {
     .filter(Boolean)
     .join(' · ');
 
-  const [sectionUseForTestFilter] = useState(SECTION_USE_FOR_TEST_FILTER.ALL);
 
-  const {
-    sections,
-    sectionErrors,
-    activeSkill,
-    activeSectionId,
-    handleSkillSelect,
-    handleOutlineNavigate,
-  } = useQuestionBankEditorUi({ resetKey: pathId });
+  const { sectionErrors } = useQuestionBankEditorUi({ resetKey: pathId });
   const handlePathSelect = (nextPathId) => {
     if (String(nextPathId) === String(pathId)) return;
     navigate(`/mentor/question-banks/${courseId}/${nextPathId}`, {
@@ -89,7 +99,10 @@ export default function MentorQuestionBankManagePage() {
         axios.get(`http://localhost:5000/api/questionBank/path/questions?pathId=${pathId}`)
       ])
       setStatsForSkillNav(resPaths.data.data.chapters)
-      setSectionsPath(resSectionsPath.data.pathSections)
+      const rawSections = resSectionsPath.data.pathSections ?? []
+      const sections = await loadPathSectionsForEditor(rawSections)
+      setSectionsPath(sections)
+      setSelectedSectionId(sections[0]?.SectionId)
     })()
   }, [courseId, pathId])
   //__Number question in path's question bank
@@ -104,6 +117,54 @@ export default function MentorQuestionBankManagePage() {
       VOCABULARY: stat.vocabularySectionGroups.filter((section) => section.isUseForTest === true),
     }))
   }
+
+  // Filter sections
+  const filterSection = sectionsPath
+    .filter((section) => {
+      return Number(section.TypeId) === Number(selectedSkillId)
+    })
+    .filter((section) => {
+      if (sectionIsUseForTest === 'ALL') return section;
+      if (sectionIsUseForTest === 'YES') return section.IsUseForTest === true;
+      if (sectionIsUseForTest === 'NO') return section.IsUseForTest === false;
+    })
+
+
+  const sectionsBySkill = sectionsPath.filter(
+    (section) => Number(section.TypeId) === Number(selectedSkillId),
+  )
+  const filterSectionCounts = {
+    [SECTION_USE_FOR_TEST_FILTER.ALL]: sectionsBySkill.length,
+    [SECTION_USE_FOR_TEST_FILTER.YES]: sectionsBySkill.filter((section) => section.IsUseForTest === true).length,
+    [SECTION_USE_FOR_TEST_FILTER.NO]: sectionsBySkill.filter((section) => section.IsUseForTest === false).length,
+  }
+
+  // useEffect auto set FIRST section of sections is selected
+  useEffect(() => {
+    setSelectedSectionId(filterSection[0]?.SectionId)
+  }, [selectedSkillId, sectionIsUseForTest])
+
+  // Kỹ năng + section đang chọn — đồng bộ với mục lục
+  const activeSkill = SKILL_BY_TYPE_ID[Number(selectedSkillId)] ?? TEST_SKILL_LISTENING;
+  const activeSectionKey = useMemo(() => {
+    const section = sectionsPath.find((item) => Number(item.SectionId) === Number(selectedSectionId));
+    return section?.tempId ?? '';
+  }, [sectionsPath, selectedSectionId]);
+
+  // Click mục lục → đổi tab kỹ năng/bài rồi scroll tới section/câu
+  const handleOutlineNavigate = (target) => {
+    if (target?.skill) {
+      setSelectedSkillId(SKILL_TO_TYPE_ID[target.skill] ?? 1);
+    }
+    if (target?.sectionTempId) {
+      const section = sectionsPath.find((item) => String(item.tempId) === String(target.sectionTempId));
+      if (section) {
+        setSelectedSkillId(Number(section.TypeId));
+        setSelectedSectionId(section.SectionId);
+      }
+    }
+    scrollToQuestionBankItem(target, { delayMs: 300 });
+  };
 
   return (
     <Box sx={{ width: '100%', maxWidth: { xs: '100%', lg: 1520 }, mx: 'auto' }}>
@@ -128,10 +189,10 @@ export default function MentorQuestionBankManagePage() {
         <MentorQuestionBankSkillNav
           pathId={pathId}
           statsForSkillNav={statsForSkillNav}
-          activeSkill={activeSkill}
+          selectedSkillId={selectedSkillId}
+          setSelectedSkillId={setSelectedSkillId}
           sectionErrors={sectionErrors}
           sectionUseForTest={sectionUseForTest(statsForSkillNav, pathId)}
-          onSkillChange={handleSkillSelect}
         />
 
         <Box
@@ -146,14 +207,24 @@ export default function MentorQuestionBankManagePage() {
           }}
         >
           <MentorQuestionBankBuilderPanel
-            sectionsPath={sectionsPath}
+            sectionsPath={filterSection}
+            setSectionsPath={setSectionsPath}
+            sectionsBySkill={sectionsBySkill}
+            filterSectionCounts={filterSectionCounts}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
+            sectionIsUseForTest={sectionIsUseForTest}
+            sectionUseForTest={sectionUseForTest(statsForSkillNav, pathId)}
+            setSectionIsUseForTest={setSectionIsUseForTest}
+            statsForSkillNav={statsForSkillNav}
+            selectedSkillId={selectedSkillId}
           />
 
           <MentorQuestionBankOutlinePanel
-            sections={sections}
+            sections={sectionsPath}
             activeSkill={activeSkill}
-            activeSectionId={activeSectionId}
-            sectionUseForTestFilter={sectionUseForTestFilter}
+            activeSectionId={activeSectionKey}
+            sectionUseForTestFilter={sectionIsUseForTest}
             onNavigateToItem={handleOutlineNavigate}
             courseName={course.CourseName}
             courseCategory={courseCategory}

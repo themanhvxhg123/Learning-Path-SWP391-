@@ -80,6 +80,7 @@ SELECT
     qs.SectionId,
     qs.SectionName,
     qs.Title AS SectionTitle,
+    qs.SourceUrl,
     qs.IsUseForTest,
     JSON_QUERY((
         SELECT
@@ -512,9 +513,23 @@ const getCourseQuestionBankActiveStats = async (courseId) => {
     };
 };
 
+// Update status of SECTION
+const updateStatusSectionModel = async (sectionId, status) => {
+    //     UPDATE [dbo].[Question_Sections]
+    //    SET [IsUseForTest] = 
+    //  WHERE [Question_Sections].SectionId = 
+    const request = new sql.Request();
+    request.input('sectionId', sql.Int, Number(sectionId));
+    request.input('status', sql.Int, Number(courseId));
+    await request.query(`
+      UPDATE [dbo].[Question_Sections]
+       SET [IsUseForTest] = @status
+     WHERE [Question_Sections].SectionId = @sectionId`);
+}
 module.exports = {
     getAllListQuestionBankByMentorId,
     getChapterQuestionBankActiveStats,
     getCourseQuestionBankActiveStats,
-    getAllSectionPathModel
+    getAllSectionPathModel,
+    updateStatusSectionModel
 };

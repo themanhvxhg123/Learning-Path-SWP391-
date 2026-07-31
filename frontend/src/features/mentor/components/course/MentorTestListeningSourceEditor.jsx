@@ -97,11 +97,14 @@ export default function MentorTestListeningSourceEditor({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [removedFileSnapshot, setRemovedFileSnapshot] = useState(null);
 
-  const audioUrl = String(section.AudioUrl ?? '').trim();
+  const audioUrl = String(section.AudioUrl ?? section.SourceUrl ?? '').trim();
+  const audioSourceType =
+    section.AudioSourceType
+    ?? (audioUrl && !section.FileName && !section.File ? LISTENING_SOURCE_LINK : LISTENING_SOURCE_UPLOAD);
   const hasUploadedMedia = Boolean(section.FileName || audioUrl);
   const hasLocalFile = Boolean(section.File);
   const hasFile = hasUploadedMedia || hasLocalFile;
-  const hasLink = Boolean(audioUrl) && section.AudioSourceType === LISTENING_SOURCE_LINK;
+  const hasLink = Boolean(audioUrl) && audioSourceType === LISTENING_SOURCE_LINK;
   const displayFileName = section.File?.name ?? section.FileName ?? '';
   const displayFileSize = section.File?.size ?? section.FileSize;
   const isBusy = disabled || uploading;

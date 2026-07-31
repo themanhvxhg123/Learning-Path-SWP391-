@@ -62,9 +62,10 @@ export default function MentorTestReadingSourceEditor({
   }, []);
 
   const contentError = errors.Description;
-  const materialUrl = String(section.MaterialUrl ?? '').trim();
+  const materialUrl = String(section.MaterialUrl ?? section.SourceUrl ?? '').trim();
   const hasRemoteReadingUrl = Boolean(materialUrl);
   const hasLocalContent = Boolean(String(section.Description ?? '').trim());
+  const passageKey = section.tempId ?? section.SectionId ?? READING_PASSAGE_ID;
 
   return (
     <Box sx={{ mb: 1.5 }}>
@@ -74,13 +75,14 @@ export default function MentorTestReadingSourceEditor({
 
       <MentorTextMaterialEditor
         material={{
-          tempId: section.tempId ?? READING_PASSAGE_ID,
+          tempId: passageKey,
           Content: section.Description ?? '',
           MaterialUrl: materialUrl,
         }}
         errors={{ Content: contentError }}
         disabled={disabled}
         compact
+        previewOnly={questionBankMode}
         defaultShowPreview={questionBankMode && hasRemoteReadingUrl}
         previewOnRemoteLoad={questionBankMode && hasRemoteReadingUrl && !hasLocalContent}
         onRegisterFlush={handleRegisterComposeFlush}

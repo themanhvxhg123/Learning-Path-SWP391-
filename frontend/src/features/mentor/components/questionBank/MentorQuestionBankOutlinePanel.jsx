@@ -153,7 +153,9 @@ function truncateQuestionLabel(text, max = 48) {
 
 function getOutlineSectionLabel(section, sections) {
   const order = getSectionBaiNumber(section, sections);
-  const customName = String(section?.DisplayName ?? section?.SectionTitle ?? '').trim();
+  const customName = String(
+    section?.DisplayName ?? section?.SectionName ?? section?.SectionTitle ?? '',
+  ).trim();
   const fallback = getQuestionBankSectionTabLabel(section, sections);
 
   if (isQuestionBankVocabularySkill(section?.SkillType)) {
@@ -477,6 +479,7 @@ export default function MentorQuestionBankOutlinePanel({
     const section = sections.find((item) => String(item.tempId) === String(activeSectionId));
     if (!section) return;
     setExpandedSkills(new Set([section.SkillType]));
+    setExpandedSections(new Set([activeSectionId]));
   }, [activeSectionId, sections]);
 
   const handleNavigate = (target) => {
@@ -606,7 +609,14 @@ export default function MentorQuestionBankOutlinePanel({
                         accent={theme?.color ?? PRIMARY}
                         expanded={isSectionExpanded}
                         active={isSectionActive}
-                        onToggle={() => toggleSectionExpanded(section.tempId)}
+                        onToggle={() => {
+                          toggleSectionExpanded(section.tempId);
+                          handleNavigate({
+                            type: 'section',
+                            skill,
+                            sectionTempId: section.tempId,
+                          });
+                        }}
                       >
                         <Box
                           sx={{

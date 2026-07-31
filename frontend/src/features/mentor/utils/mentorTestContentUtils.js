@@ -280,9 +280,9 @@ export function isQuestionActive(question) {
 }
 
 export const SECTION_USE_FOR_TEST_FILTER = {
-  ALL: 'all',
-  IN_TEST: 'in_test',
-  NOT_IN_TEST: 'not_in_test',
+  ALL: 'ALL',
+  NO: 'NO',
+  YES: 'YES',
 };
 
 export function isSectionUseForTest(section) {
@@ -861,7 +861,7 @@ export function getSectionsBySkill(sections = [], skillType) {
   const target = normalizeQuestionBankSkillType(skillType);
   return sections.filter(
     (section) =>
-      normalizeQuestionBankSkillType(section.SkillType, section.typeId) === target,
+      normalizeQuestionBankSkillType(section.SkillType, section.typeId ?? section.TypeId) === target,
   );
 }
 
@@ -877,7 +877,11 @@ export function getSectionBySkill(sections = [], skillType) {
 export function getSectionBaiNumber(section, sections = []) {
   if (!section) return 1;
   const skillSections = getVisibleSectionsBySkill(sections, section.SkillType);
-  const index = skillSections.findIndex((item) => item.tempId === section.tempId);
+  const index = skillSections.findIndex(
+    (item) =>
+      item.tempId === section.tempId
+      || Number(item.SectionId) === Number(section.SectionId),
+  );
   return index >= 0 ? index + 1 : skillSections.length + 1;
 }
 
@@ -1763,7 +1767,8 @@ export function buildTestSectionPayload(section, sectionOrder) {
 export function scrollToQuestionBankItem(target, { delayMs = 180 } = {}) {
   window.setTimeout(() => {
     if (target?.type === 'question' && target.questionTempId) {
-      document.getElementById(`qb-question-${target.questionTempId}`)?.scrollIntoView({
+      const questionId = target.questionTempId;
+      document.getElementById(`qb-question-${questionId}`)?.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
       });

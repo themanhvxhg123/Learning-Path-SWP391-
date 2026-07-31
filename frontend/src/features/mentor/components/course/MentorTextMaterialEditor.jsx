@@ -239,6 +239,8 @@ export default function MentorTextMaterialEditor({
   compact = false,
   previewOnRemoteLoad = false,
   defaultShowPreview = false,
+  /** Ngân hàng câu hỏi: chỉ xem HTML, không toolbar soạn Word */
+  previewOnly = false,
 }) {
   const editorRef = useRef(null);
   const savedRangeRef = useRef(null);
@@ -248,7 +250,7 @@ export default function MentorTextMaterialEditor({
   const proactiveSyncTimerRef = useRef(null);
   const materialTempIdRef = useRef(material.tempId);
   const onChangeRef = useRef(onChange);
-  const [showPreview, setShowPreview] = useState(defaultShowPreview);
+  const [showPreview, setShowPreview] = useState(defaultShowPreview || previewOnly);
   const [formats, setFormats] = useState({ ...EMPTY_FORMATS });
   const [editorEmpty, setEditorEmpty] = useState(true);
   const [editorFocused, setEditorFocused] = useState(false);
@@ -496,8 +498,8 @@ export default function MentorTextMaterialEditor({
   }, [material.tempId, material._restoreAt]);
 
   useEffect(() => {
-    setShowPreview(defaultShowPreview);
-  }, [material.tempId, material._restoreAt, defaultShowPreview]);
+    setShowPreview(defaultShowPreview || previewOnly);
+  }, [material.tempId, material._restoreAt, defaultShowPreview, previewOnly]);
 
   useEffect(() => {
     if (editorFocused || isComposingRef.current) return;
@@ -579,27 +581,29 @@ export default function MentorTextMaterialEditor({
             Soạn nội dung văn bản
           </Typography>
         ) : null}
-        <AppButton
-          variant="outlined"
-          size="small"
-          onClick={handleTogglePreview}
-          sx={{
-            minWidth: 0,
-            height: 30,
-            px: 1.25,
-            borderRadius: '999px',
-            fontSize: 12,
-            fontWeight: 600,
-            borderColor: 'rgba(15,23,42,0.12)',
-            color: MUTED,
-            '&:hover': { borderColor: theme.color, color: theme.color, bgcolor: 'rgba(8,145,178,0.06)' },
-          }}
-        >
-          {showPreview ? 'Soạn thảo' : 'Xem trước'}
-        </AppButton>
+        {!previewOnly ? (
+          <AppButton
+            variant="outlined"
+            size="small"
+            onClick={handleTogglePreview}
+            sx={{
+              minWidth: 0,
+              height: 30,
+              px: 1.25,
+              borderRadius: '999px',
+              fontSize: 12,
+              fontWeight: 600,
+              borderColor: 'rgba(15,23,42,0.12)',
+              color: MUTED,
+              '&:hover': { borderColor: theme.color, color: theme.color, bgcolor: 'rgba(8,145,178,0.06)' },
+            }}
+          >
+            {showPreview ? 'Soạn thảo' : 'Xem trước'}
+          </AppButton>
+        ) : null}
       </Box>
 
-      {showPreview && (
+      {(previewOnly || showPreview) && (
         <Box sx={{ mb: showPreview ? 1.25 : 0 }}>
           <ContentFieldLabel sx={{ mb: 0.5, fontSize: 12, fontWeight: 700, color: '#64748B' }}>
             Xem trước
@@ -621,6 +625,7 @@ export default function MentorTextMaterialEditor({
         </Box>
       )}
 
+      {!previewOnly ? (
       <Box sx={{ display: showPreview ? 'none' : 'block' }}>
         <Box
           sx={{
@@ -835,8 +840,9 @@ export default function MentorTextMaterialEditor({
           </Typography>
         )}
       </Box>
+      ) : null}
 
-      {errors.Content && showPreview ? (
+      {errors.Content && (previewOnly || showPreview) ? (
         <Typography sx={{ fontSize: 11, color: '#DC2626', mt: 0.35 }}>
           {errors.Content}
         </Typography>

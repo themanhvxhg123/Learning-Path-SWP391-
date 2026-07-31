@@ -1,13 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Chip, Switch, Tooltip, Typography } from '@mui/material';
-import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import axios from 'axios';
 import { MUTED, TEXT } from './mentorCourseCreateStyles';
 import MentorQuestionTypeFields from './MentorQuestionTypeFields';
-import {
-  isQuestionActive,
-  normalizeTestQuestion,
-} from '@/features/mentor/utils/mentorTestContentUtils';
+import ConfirmDialog from '@/shared/ui/ConfirmDialog';
+import { isQuestionActive } from '@/features/mentor/utils/mentorTestContentUtils';
 
 export default function MentorTestQuestionCard({
   question,
@@ -16,31 +15,92 @@ export default function MentorTestQuestionCard({
   accentColor,
   disabled = false,
   contentLocked = false,
-  hideDelete = false,
+  hideEdit = false,
   useForTestLocked = false,
   useForTestLockMessage = '',
   showActiveToggle = false,
   collapsibleChoices = false,
+  questionBankChoices = false,
+  readOnlyTexts = false,
   onChange,
-  onDelete,
+  onEdit,
 }) {
   const [choicesExpanded, setChoicesExpanded] = useState(false);
-  const normalizedQuestion = normalizeTestQuestion(question);
-  const isActive = isQuestionActive(normalizedQuestion);
+  // QB: confirm trước khi đổi switch (giống section)
+  const confirmUseForTestToggle = questionBankChoices && showActiveToggle;
+  const [switchUseForTest, setSwitchUseForTest] = useState(() => isQuestionActive(question));
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingUseForTest, setPendingUseForTest] = useState(null);
+
+  useEffect(() => {
+    setSwitchUseForTest(isQuestionActive(question));
+  }, [question]);
+
+  const isActive = confirmUseForTestToggle ? switchUseForTest : isQuestionActive(question);
   const fieldsDisabled = disabled || contentLocked;
 
-  const handleChange = (nextQuestion) => onChange(normalizeTestQuestion(nextQuestion));
+  const handleChange = (nextQuestion) => onChange(nextQuestion);
+
+  const applyUseForTest = (next) => {
+    setSwitchUseForTest(next);
+    handleChange({
+      ...question,
+      isUseForTest: next,
+      IsUseForTest: next,
+    });
+    if (question.QuestionId) {
+      (async () => {
+        try {
+          await axios.post('http://localhost:5000/api/questionBank/question/updateStatus', {
+            questionId: question.QuestionId,
+            status: next,
+          });
+        } catch (error) {
+          console.error(error.message);
+        }
+      })();
+    }
+  };
 
   const handleActiveToggle = (event) => {
-    handleChange({ ...normalizedQuestion, isUseForTest: event.target.checked });
+    const next = event.target.checked;
+    applyUseForTest(next);
+  };
+
+  const handleQuestionSwitchClick = (event) => {
+    event.preventDefault();
+    if (disabled || useForTestLocked) return;
+    setPendingUseForTest(!switchUseForTest);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmUseForTest = () => {
+    applyUseForTest(pendingUseForTest);
+    setConfirmOpen(false);
+    setPendingUseForTest(null);
+  };
+
+  const handleCancelUseForTest = () => {
+    setConfirmOpen(false);
+    setPendingUseForTest(null);
   };
 
   const isInactive = showActiveToggle && !isActive;
   const hasCorrectAnswerError = Boolean(errors._correctOption);
 
+  const handleEditClick = () => {
+    onEdit?.(question);
+  };
+
   return (
     <Box
-      id={normalizedQuestion.tempId ? `qb-question-${normalizedQuestion.tempId}` : undefined}
+      id={
+        question.tempId
+          ? `qb-question-${question.tempId}`
+          : question.QuestionId
+            ? `qb-question-${question.QuestionId}`
+            : undefined
+      }
       sx={{
         borderRadius: '10px',
         border: hasCorrectAnswerError
@@ -114,8 +174,10 @@ export default function MentorTestQuestionCard({
                 <Switch
                   size="small"
                   checked={isActive}
-                  onChange={handleActiveToggle}
+                  onChange={confirmUseForTestToggle ? () => {} : handleActiveToggle}
                   disabled={disabled || useForTestLocked}
+                  slotProps={confirmUseForTestToggle ? { input: { readOnly: true } } : undefined}
+                  onClick={confirmUseForTestToggle ? handleQuestionSwitchClick : undefined}
                   inputProps={{
                     'aria-label': collapsibleChoices
                       ? 'Dùng câu hỏi trong bài kiểm tra'
@@ -139,13 +201,13 @@ export default function MentorTestQuestionCard({
 
         <Box sx={{ flex: 1 }} />
 
-        {!contentLocked && !hideDelete ? (
+        {!contentLocked && !hideEdit ? (
           <Box
             component="button"
             type="button"
-            onClick={onDelete}
+            onClick={handleEditClick}
             disabled={fieldsDisabled}
-            aria-label="Xóa câu hỏi"
+            aria-label="Sửa câu hỏi"
             sx={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -171,20 +233,20 @@ export default function MentorTestQuestionCard({
               '&:hover': fieldsDisabled
                 ? undefined
                 : {
-                    color: '#DC2626',
-                    bgcolor: 'rgba(220,38,38,0.06)',
+                    color: accentColor,
+                    bgcolor: 'rgba(15,23,42,0.06)',
                   },
             }}
           >
-            <DeleteOutlineRoundedIcon />
-            Xóa
+            <EditOutlinedIcon />
+            Edit
           </Box>
         ) : null}
       </Box>
 
       <Box sx={{ px: { xs: 1.25, sm: 1.35 }, pt: collapsibleChoices ? 0.85 : 1.15, pb: 1.35 }}>
         <MentorQuestionTypeFields
-          question={normalizedQuestion}
+          question={question}
           errors={errors}
           accentColor={accentColor}
           disabled={fieldsDisabled}
@@ -193,8 +255,23 @@ export default function MentorTestQuestionCard({
           choicesExpanded={choicesExpanded}
           onChoicesExpandedChange={setChoicesExpanded}
           questionIndex={index}
+          questionBankChoices={questionBankChoices}
+          readOnlyTexts={readOnlyTexts}
         />
       </Box>
+
+      {confirmUseForTestToggle ? (
+        <ConfirmDialog
+          open={confirmOpen}
+          onClose={handleCancelUseForTest}
+          onConfirm={handleConfirmUseForTest}
+          title="Đổi trạng thái dùng trong test?"
+          message="Bạn có chắc muốn thay đổi câu hỏi này?"
+          confirmLabel="Đồng ý"
+          cancelLabel="Hủy"
+          loading={false}
+        />
+      ) : null}
     </Box>
   );
 }

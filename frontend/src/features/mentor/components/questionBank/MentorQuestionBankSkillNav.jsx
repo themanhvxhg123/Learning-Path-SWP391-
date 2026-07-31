@@ -24,7 +24,8 @@ import {
 } from '@/features/mentor/utils/mentorTestContentUtils';
 import { getSkillTestUsageLabel } from '@/features/mentor/utils/mentorChapterQuizConfigUtils';
 
-const SKILL_NAV_ITEMS = QUESTION_BANK_SKILLS.map((skill) => ({
+const SKILL_NAV_ITEMS = QUESTION_BANK_SKILLS.map((skill, index) => ({
+  skillTypeId: Number(index + 1),
   skill,
   label: TEST_SKILL_LABELS[skill],
   icon: skill === TEST_SKILL_LISTENING
@@ -97,7 +98,7 @@ function SkillNavButton({
         </Typography>
         {sectionUseForTest ? (
           <Typography sx={{ fontSize: 11, color: '#047857', mt: 0.2, lineHeight: 1.35, fontWeight: 600 }}>
-            {sectionUseForTest[0]?.[skill]?.length} section dùng trong question bank
+            {sectionUseForTest[0]?.[skill]?.length} section dùng trong TEST
           </Typography>
         ) : null}
       </Box>
@@ -109,11 +110,11 @@ export default function MentorQuestionBankSkillNav({
   pathId,
   statsForSkillNav = [],
   sections = [],
-  activeSkill,
   disabled = false,
   sectionErrors = {},
   sectionUseForTest = null,
-  onSkillChange,
+  selectedSkillId,
+  setSelectedSkillId,
 }) {
 
   const normalizationSkill = (skill) => {
@@ -165,7 +166,7 @@ export default function MentorQuestionBankSkillNav({
           Kỹ năng
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35 }}>
-          {SKILL_NAV_ITEMS.map(({ skill, label, icon }) => {
+          {SKILL_NAV_ITEMS.map(({ skillTypeId, skill, label, icon }) => {
             const theme = TEST_SKILL_CHIP_COLORS[skill];
             const numberSectionInSkill = countSectionInSkill(statsForSkillNav, pathId, skill)
             const numberQuestionInSkill = countQuestionInSkill(statsForSkillNav, pathId, skill)
@@ -180,10 +181,10 @@ export default function MentorQuestionBankSkillNav({
                 numberSectionInSkill={numberSectionInSkill}
                 numberQuestionInSkill={numberQuestionInSkill}
                 sectionUseForTest={sectionUseForTest}
-                selected={activeSkill === skill}
+                selected={Number(selectedSkillId) === Number(skillTypeId)}
                 disabled={disabled}
                 hasError={errorBySkill[skill]}
-                onClick={() => onSkillChange?.(skill)}
+                onClick={() => setSelectedSkillId(skillTypeId)}
               />
             );
           })}
