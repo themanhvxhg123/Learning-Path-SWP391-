@@ -1,7 +1,14 @@
 /**
  * Admin Account Service — calls real backend APIs.
+ *
+ * 📍 VỊ TRÍ TRONG LUỒNG CHỈNH SỬA (BƯỚC 6 - GỌI API):
+ * File này chứa các hàm gọi API backend. Hàm updateAccount() được gọi từ
+ * AdminAccountManagementPage khi người dùng lưu thay đổi tài khoản.
+ * ➡️ Đến từ: AdminAccountManagementPage.jsx (dòng 157) — frontend/src/features/admin/pages/AdminAccountManagementPage.jsx
+ * ➡️ Đi tiếp: adminApiClient.js (dòng 59) — frontend/src/features/admin/services/adminApiClient.js
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '@/features/admin/services/adminApiClient';
+
 
 /**
  * Map a backend user record to the frontend account shape.
@@ -42,7 +49,7 @@ export async function createAccount(payload) {
     Email: payload.email,
     Phone: payload.phone || '',
     DateOfBirth: payload.dateOfBirth || null,
-    Password: payload.tempPassword || '123456',
+    Password: payload.tempPassword || '123456', 
     Role: payload.role || 'Student',
   });
   if (!res.ok) {
@@ -51,6 +58,14 @@ export async function createAccount(payload) {
   return { ok: true, account: mapUserToAccount(res.data) };
 }
 
+// ===== HÀM CẬP NHẬT TÀI KHOẢN (BƯỚC 6a) =====
+// Đây là hàm được gọi từ AdminAccountManagementPage khi người dùng lưu thay đổi.
+// CÁCH HOẠT ĐỘNG:
+//   1. Nếu đổi vai trò -> gọi PUT /users/{id}/roles
+//   2. Nếu đổi trạng thái -> gọi PUT /users/{id}/active
+//   3. Gọi GET /users/{id} để lấy lại dữ liệu mới nhất
+// ➡️ Đến từ: AdminAccountManagementPage.jsx (dòng 157) — frontend/src/features/admin/pages/AdminAccountManagementPage.jsx
+// ➡️ Đi tiếp: adminApiClient.js (dòng 59) — frontend/src/features/admin/services/adminApiClient.js
 export async function updateAccount(id, payload) {
   const userId = Number(id);
 
@@ -84,6 +99,7 @@ export async function updateAccount(id, payload) {
 
   return { ok: true, account };
 }
+
 
 export async function toggleAccountStatus(id, isActive) {
   const userId = Number(id);

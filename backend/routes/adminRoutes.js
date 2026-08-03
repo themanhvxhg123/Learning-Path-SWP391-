@@ -28,6 +28,12 @@ const {
 router.get('/dashboard', protect, adminOnly, getDashboard);
 
 // ========== USERS ==========
+// 📍 VỊ TRÍ TRONG LUỒNG CHỈNH SỬA TÀI KHOẢN (BƯỚC 8 - ĐỊNH TUYẾN BACKEND):
+// Đây là nơi backend nhận request từ frontend. Khi admin sửa tài khoản:
+//   - Đổi vai trò   -> PUT /users/:userId/roles  -> gọi updateUserRoles
+//   - Đổi trạng thái -> PUT /users/:userId/active -> gọi toggleUserActive
+// ➡️ Đến từ: adminApiClient.js (dòng 59) — frontend/src/features/admin/services/adminApiClient.js
+// ➡️ Đi tiếp: adminController.js (hàm updateUserRoles, toggleUserActive) — backend/controllers/adminController.js
 router.get('/users', protect, adminOnly, getUsers);
 router.post('/users', protect, adminOnly, createUser);
 router.get('/users/:userId', protect, adminOnly, getUserDetail);
@@ -35,6 +41,7 @@ router.put('/users/:userId', protect, adminOnly, updateUser);
 router.delete('/users/:userId', protect, adminOnly, deleteUser);
 router.put('/users/:userId/roles', protect, adminOnly, updateUserRoles);
 router.put('/users/:userId/active', protect, adminOnly, toggleUserActive);
+
 
 // ========== ROLES ==========
 router.get('/roles', protect, adminOnly, getRoles);

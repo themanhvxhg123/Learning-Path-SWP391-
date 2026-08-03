@@ -1,4 +1,15 @@
+// ===== AdminAccountFormDialog.jsx =====
+// Dialog (hộp thoại) chỉnh sửa tài khoản - cho phép đổi vai trò và trạng thái.
+//
+// 📍 VỊ TRÍ TRONG LUỒNG CHỈNH SỬA (BƯỚC 4 - HIỂN THỊ FORM):
+// File này hiển thị form chỉnh sửa khi người dùng bấm nút sửa. Nó nhận account
+// từ trang chính, cho người dùng đổi vai trò/trạng thái, rồi gọi onSubmit để
+// gửi dữ liệu lên trang chính.
+// ➡️ Đến từ: AdminAccountManagementPage.jsx (dòng 271) — frontend/src/features/admin/pages/AdminAccountManagementPage.jsx
+// ➡️ Đi tiếp: AdminAccountManagementPage.jsx (dòng 152) — frontend/src/features/admin/pages/AdminAccountManagementPage.jsx
+
 import { useEffect, useMemo, useState } from 'react';
+
 import {
   Avatar,
   Box,
@@ -146,6 +157,10 @@ export default function AdminAccountFormDialog({
     return buildChangeSummary(account, role, status);
   }, [account, role, status]);
 
+  // ===== HÀM XỬ LÝ KHI BẤM "LƯU THAY ĐỔI" (BƯỚC 4a) =====
+  // Đây là hàm được gọi khi người dùng bấm nút "Lưu thay đổi" trong dialog.
+  // CÁCH HOẠT ĐỘNG: Kiểm tra form hợp lệ -> nếu không có thay đổi thì báo toast,
+  // nếu có thay đổi thì mở hộp thoại xác nhận (ConfirmDialog).
   const handleSaveClick = () => {
     const validationErrors = validateAccountEditForm({ role, status });
     if (hasAccountEditErrors(validationErrors)) {
@@ -158,13 +173,18 @@ export default function AdminAccountFormDialog({
       return;
     }
 
-    setConfirmOpen(true);
+    setConfirmOpen(true);  // Mở hộp thoại xác nhận
   };
 
+  // ===== HÀM XÁC NHẬN LƯU (BƯỚC 4b) =====
+  // Đây là hàm được gọi khi người dùng bấm "Lưu thay đổi" trong hộp thoại xác nhận.
+  // CÁCH HOẠT ĐỘNG: Gọi onSubmit với { role, status } để gửi dữ liệu lên trang chính.
+  // ➡️ Đi tiếp: AdminAccountManagementPage.jsx (dòng 152) — frontend/src/features/admin/pages/AdminAccountManagementPage.jsx
   const handleConfirmSave = async () => {
     await onSubmit?.({ role, status });
     setConfirmOpen(false);
   };
+
 
   const isSelf = currentUserId && account?.id === currentUserId;
 
