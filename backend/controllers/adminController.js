@@ -88,6 +88,12 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// ===== HÀM CẬP NHẬT TRẠNG THÁI TÀI KHOẢN (BƯỚC 8b) =====
+// Đây là hàm xử lý khi admin đổi trạng thái (Active/Locked) của tài khoản.
+// CÁCH HOẠT ĐỘNG: Nhận userId từ URL và IsActive từ body, kiểm tra không cho
+// admin tự khóa chính mình, rồi gọi adminModel.toggleUserActive để cập nhật DB.
+// ➡️ Đến từ: adminRoutes.js (dòng 37) — backend/routes/adminRoutes.js
+// ➡️ Đi tiếp: adminModel.js (hàm toggleUserActive) — backend/Models/adminModel.js
 const toggleUserActive = async (req, res) => {
   try {
     const userId = Number(req.params.userId);
@@ -107,10 +113,17 @@ const toggleUserActive = async (req, res) => {
   }
 };
 
+
 // ==========================================
 // USER ROLES
 
 // ==========================================
+// ===== HÀM CẬP NHẬT VAI TRÒ TÀI KHOẢN (BƯỚC 8a) =====
+// Đây là hàm xử lý khi admin đổi vai trò (Admin/Mentor/Student) của tài khoản.
+// CÁCH HOẠT ĐỘNG: Nhận userId từ URL và roleIds (mảng ID vai trò) từ body,
+// kiểm tra roleIds phải là mảng, rồi gọi adminModel.setUserRoles để cập nhật DB.
+// ➡️ Đến từ: adminRoutes.js (dòng 36) — backend/routes/adminRoutes.js
+// ➡️ Đi tiếp: adminModel.js (hàm setUserRoles) — backend/Models/adminModel.js
 const updateUserRoles = async (req, res) => {
   try {
     const userId = Number(req.params.userId);
@@ -125,6 +138,7 @@ const updateUserRoles = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 };
+
 
 // ==========================================
 // ROLES
