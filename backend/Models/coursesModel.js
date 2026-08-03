@@ -95,6 +95,7 @@ const getStudentCoursesList = async (filters, userId) => {
         FROM Courses crs
         LEFT JOIN Categories cate ON crs.CategoryId = cate.CategoryId
         LEFT JOIN Levels lv ON crs.LevelId = lv.LevelId
+         LEFT JOIN Users u ON crs.InstructorId = u.UserId 
         LEFT JOIN User_Courses uc ON crs.CourseId = uc.CourseId AND uc.UserId = @UserId
         WHERE crs.IsPublished = 1
     `;
@@ -141,7 +142,7 @@ const getStudentCoursesList = async (filters, userId) => {
   // Truy vấn dữ liệu chi tiết
   let selectQuery = `
         SELECT crs.CourseId, crs.CourseName, crs.Description, crs.CategoryId, crs.LevelId,
-               crs.Rating, 
+               crs.Rating, u.FullName AS Instructor,
                (SELECT COUNT(*) FROM User_Courses uc2 WHERE uc2.CourseId = crs.CourseId) AS StudentCount,
                lv.LevelName as levelName, lv.DisplayName as LevelDisplayName,
                crs.Thumbnail, crs.CreatedAt, crs.UpdatedAt,

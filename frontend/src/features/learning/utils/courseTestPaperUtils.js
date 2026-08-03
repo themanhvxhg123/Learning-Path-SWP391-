@@ -286,7 +286,7 @@ export function buildTestPaperFromLoadedBank(config, bank, options = {}) {
   const paper = buildPaperFromBanks(config, [bank], options);
   if (paper.totalQuestions <= 0) {
     return { ok: false, message: 'Không đủ câu hỏi để tạo đề kiểm tra.' };
-  }
+  } 
 
   return { ok: true, paper };
 }

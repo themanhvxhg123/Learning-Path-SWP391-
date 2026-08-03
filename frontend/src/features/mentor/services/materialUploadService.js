@@ -1,3 +1,23 @@
+/**
+ * =============================================================================
+ * Facade upload / hydrate học liệu (mentor UI → API hoặc Cloudinary)
+ * =============================================================================
+ *
+ * | Loại        | Hàm export              | Đường đi |
+ * |-------------|-------------------------|----------|
+ * | TEXT        | uploadTextMaterial      | POST /api/materials/upload JSON type=TEXT |
+ * | DOC         | uploadDocMaterial       | POST multipart qua XHR (progress) |
+ * | READING_DOC | uploadReadingDocMaterial| POST multipart (QB reading file) |
+ * | AUDIO       | uploadAudioMaterial     | cloudinaryDirectUpload (browser → Cloudinary) |
+ * | VIDEO       | uploadVideoMaterial     | cloudinaryDirectUpload |
+ *
+ * Sau upload: component gán MaterialUrl, FileName, FileSize; xóa File local.
+ *
+ * fetchTextMaterialHtml: GET /api/materials/text-content?url= — hydrate editor TEXT.
+ * getMentorMaterialDownloadHref: link GET /api/mentor/materials/download (backend fetch buffer).
+ *
+ * Orchestration trước lưu khóa: mentorMaterialUploadUtils.uploadPendingMaterialsInPaths.
+ */
 import { uploadListeningAudioToCloudinary, uploadVideoToCloudinary } from '@/shared/services/cloudinaryDirectUpload';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/+$/, '') + '/api';
@@ -10,6 +30,7 @@ async function parseUploadResponse(response) {
   return data.data ?? {};
 }
 
+/** Multipart lên backend — dùng XHR để báo % upload (DOC). */
 function postMultipartUpload(path, formData, { onProgress } = {}) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

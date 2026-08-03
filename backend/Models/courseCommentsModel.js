@@ -46,7 +46,7 @@ WHERE CourseId = @courseId AND UserId = @userId AND ParentCommentId IS NULL
         `);
 
         if (checkResult.recordset.length > 0) {
-            // NẾU ĐÃ CÓ: Kiểm tra số lần sửa
+            //Kiểm tra số lần sửa
             if (checkResult.recordset[0].EditCount >= 1) {
                 throw new Error('Bạn chỉ được sửa đánh giá 1 lần duy nhất!');
             }

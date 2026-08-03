@@ -213,6 +213,7 @@ export default function App() {
         <Route path="courses/create/review" element={<MentorCreateCourseReviewPage />} />
         <Route path="courses/create/content" element={<MentorCreateCourseContentPage />} />
         <Route path="courses/create" element={<MentorCreateCoursePage />} />
+        {/* Edit khóa: info → /edit → /review (PATCH) | nội dung → /content/edit (incremental REST) */}
         <Route path="courses/:courseId/review" element={<MentorEditCourseReviewPage />} />
         <Route path="courses/:courseId/content/edit" element={<MentorEditCourseContentPage />} />
         <Route path="courses/:courseId/content" element={<MentorEditCourseContentPage />} />

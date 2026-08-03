@@ -1,3 +1,35 @@
+/**
+ * =============================================================================
+ * LUỒNG CHỈNH SỬA KHÓA HỌC (MENTOR) — BƯỚC 2: CONTENT BUILDER (INCREMENTAL SAVE)
+ * =============================================================================
+ *
+ * Routes: /mentor/courses/:courseId/content/edit | .../content
+ * Vào từ: MentorCourseContentTab → "Chỉnh sửa nội dung"
+ *
+ * ── Load ──
+ *   fetchMentorCourseDetail → mapDetailPathsToEditPaths (tempId + PathId/NodeId/MaterialId)
+ *   hydrateTextMaterialsInPaths (HTML từ Cloudinary qua /api/materials/text-content)
+ *   getChapterQuizConfigsByCourse → chặn unpublish chương có quiz
+ *
+ * ── State chính ──
+ *   paths[]          cây Path → Node → Material (UI)
+ *   dirtyKeys        path:/node:/material: đánh dấu phạm vi đã sửa
+ *   pathSnapshotsRef baseline JSON để buildCourse*SavePayload chỉ gửi diff
+ *   focusTarget      chapter-edit | lesson | material — entity đang focus
+ *
+ * ── Lưu từng phạm vi (không lưu cả khóa một lúc) ──
+ *   requestScopedSave → ConfirmDialog → executeScopedSave:
+ *     material: uploadPendingMaterialInPath (Cloudinary) → buildCourseMaterialSavePayload
+ *     node:     buildCourseNodeOnlySavePayload
+ *     path:     buildCoursePathOnlySavePayload
+ *     saveCoursePath (courseContentService) — DELETE/POST/PUT REST mentor API
+ *     applyCoursePathSaveResult — gán PathId/NodeId/MaterialId mới từ server
+ *
+ * ── Rời trang / đổi chương ──
+ *   registerNavigationGuard + requestContentNavigation → dialog nếu dirty hoặc entity mới chưa lưu
+ *
+ * Khác create wizard: edit lưu incremental; create thường bulk ở review.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Breadcrumbs, CircularProgress, Link as MuiLink, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
@@ -319,7 +351,7 @@ export default function MentorEditCourseContentPage() {
     setFocusTarget(next);
   }, []);
 
-  // ── initial load ────────────────────────────────────────────────────────────
+  // ── initial load: API → map UI → hydrate TEXT → quiz path ids → snapshot baseline ──
 
   useEffect(() => {
     let cancelled = false;
@@ -594,6 +626,7 @@ export default function MentorEditCourseContentPage() {
     requestScopedSave('material', pathTempId, nodeTempId, materialTempId);
   };
 
+  /** Mở dialog xác nhận rồi gọi executeScopedSave (path | node | material). */
   const requestScopedSave = (saveScope, pathTempId, nodeTempId, materialTempId) => {
     if (confirmSaveInFlightRef.current) return;
 
@@ -795,6 +828,10 @@ export default function MentorEditCourseContentPage() {
     return { ok: true };
   }, [clearDirtyKey]);
 
+  /**
+   * Lưu một phạm vi: upload file học liệu (nếu material) → build payload diff → saveCoursePath
+   * → merge IDs server → sync material TEXT → auto-unpublish chương nếu hết bài publish.
+   */
   const executeScopedSave = async (saveScope, pathTempId, nodeTempId, materialTempId) => {
     if (confirmSaveInFlightRef.current) return;
 

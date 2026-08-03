@@ -1,3 +1,16 @@
+/**
+ * API Mentor — map trực tiếp tới FE (courseContentService, mentorCourseService).
+ *
+ * Auth: optionalAuth gắn req.user.userId từ header x-user-id (FE getMentorAuthHeaders).
+ *
+ * CHỈNH SỬA KHÓA — thông tin cơ bản:
+ *   FE updateCourseBasicInfo → PATCH /courses/:courseId → mentorController.updateCourse
+ *
+ * CHỈNH SỬA NỘI DUNG (incremental):
+ *   FE saveCoursePath → các route bên dưới (DELETE/POST/PUT paths, nodes, materials)
+ *
+ * Chi tiết từng bước FE→BE: docs/MENTOR_EDIT_FE_TO_BE.md
+ */
 const express = require('express');
 const router = express.Router();
 

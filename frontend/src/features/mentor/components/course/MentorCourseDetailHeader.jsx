@@ -259,8 +259,8 @@ export default function MentorCourseDetailHeader({
       >
         <Tab value={MENTOR_COURSE_DETAIL_TABS.COURSE} label="Khóa học" />
         <Tab value={MENTOR_COURSE_DETAIL_TABS.CONTENT} label="Nội dung" />
-        <Tab value={MENTOR_COURSE_DETAIL_TABS.STUDENTS} label="Học viên" />
-        <Tab value={MENTOR_COURSE_DETAIL_TABS.COMMENTS} label="Bình luận" />
+        {published && <Tab value={MENTOR_COURSE_DETAIL_TABS.STUDENTS} label="Học viên" />}
+        {published && <Tab value={MENTOR_COURSE_DETAIL_TABS.COMMENTS} label="Bình luận" />}
       </Tabs>
     </Box>
   );

@@ -100,11 +100,11 @@ const getAttemptCountByUserAndTest = async (userId, testId) => {
     const result = await request.query(`
         SELECT COUNT(*) as count
         FROM dbo.Test_Attempts
-        WHERE UserId = @userId AND TestId = @testId
+        WHERE UserId = @userId AND TestId = @testId 
     `);
     return result.recordset[0].count;
 };
-
+// Đếm số lượt làm bài ĐÃ NỘP của Học viên đối với một Bài thi.
 const getSubmittedAttemptCountByUserAndTest = async (userId, testId) => {
     const request = new sql.Request();
     request.input('userId', sql.Int, Number(userId));

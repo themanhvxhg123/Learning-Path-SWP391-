@@ -1,3 +1,15 @@
+/**
+ * Controller upload học liệu lên Cloudinary (server-side).
+ *
+ * uploadMaterial(req, res):
+ *   Đọc req.body.type (TEXT | DOC | READING_DOC | AUDIO).
+ *   File binary: req.file từ materialUploadMiddleware.
+ *   Gọi cloudinaryService tương ứng → JSON { success, data: { url, deliveryUrl, fileName, ... } }.
+ *
+ * fetchTextMaterialContent(req, res):
+ *   Query ?url= — chỉ cho phép URL Cloudinary.
+ *   fetch(url) phía server, trả { html } cho editor mentor (tránh CORS khi đọc raw HTML).
+ */
 const {
   MATERIAL_MAX_SIZE_MESSAGE,
   uploadAudioFile,
@@ -17,7 +29,8 @@ function mapUploadErrorMessage(error) {
   return 'Lỗi khi tải học liệu lên.';
 }
 
-async function uploadMaterial(req, res) {  try {
+async function uploadMaterial(req, res) {
+  try {
     const type = String(req.body?.type ?? '').trim().toUpperCase();
 
     if (type === 'DOC') {
@@ -85,6 +98,7 @@ async function uploadMaterial(req, res) {  try {
     });
   }
 }
+
 function isAllowedTextMaterialUrl(rawUrl) {
   try {
     const parsed = new URL(String(rawUrl ?? '').trim());

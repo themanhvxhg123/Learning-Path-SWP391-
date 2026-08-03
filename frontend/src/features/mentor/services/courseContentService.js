@@ -1,3 +1,13 @@
+/**
+ * REST lưu nội dung khóa học từng phần (mentor content builder).
+ *
+ * saveCoursePath(body): thực thi tuần tự theo payload từ courseContentApiMappers:
+ *   materialsDelete → nodesDelete → pathInsert/Update → nodes → materials
+ * Mỗi bước gọi /api/mentor/... với x-user-id.
+ *
+ * saveEntireCoursePaths / saveAllCoursePaths (cuối file): dùng khi updateCourseContent
+ * so sánh draft paths với serverPaths rồi sync toàn khóa.
+ */
 import axios from 'axios';
 import { getUser } from '@/features/auth/utils/authUtils';
 import {
@@ -84,6 +94,11 @@ export async function fetchNodeById(nodeId) {
   }
 }
 
+/**
+ * Thực thi một batch thay đổi cho MỘT chương (path).
+ * Gọi từ MentorEditCourseContentPage.executeScopedSave hoặc saveAllCoursePaths.
+ * Thứ tự HTTP khớp docs/MENTOR_EDIT_FE_TO_BE.md mục D.
+ */
 export async function saveCoursePath(body = {}) {
   const headers = getMentorAuthHeaders();
   const courseId = body.context?.courseId;
@@ -92,6 +107,7 @@ export async function saveCoursePath(body = {}) {
   const materialIdMap = [];
 
   try {
+    // --- BE: courseContentController.deleteMaterialById ---
     for (const item of body.materialsDelete ?? []) {
       const { data } = await axios.delete(
         `${API_BASE}/mentor/materials/${encodeURIComponent(item.materialId)}`,
@@ -101,6 +117,7 @@ export async function saveCoursePath(body = {}) {
       if (!result.ok) return result;
     }
 
+    // --- BE: courseContentController.deleteNodeById ---
     for (const item of body.nodesDelete ?? []) {
       const { data } = await axios.delete(
         `${API_BASE}/mentor/nodes/${encodeURIComponent(item.nodeId)}`,
@@ -111,6 +128,7 @@ export async function saveCoursePath(body = {}) {
     }
 
     if (body.pathInsert) {
+      // --- BE: createPath → createNodeByPathId → createMaterialByNodeId (chương mới hoàn toàn) ---
       const { data } = await axios.post(
         `${API_BASE}/mentor/courses/${encodeURIComponent(courseId)}/paths`,
         { data: body.pathInsert.data },
@@ -160,7 +178,9 @@ export async function saveCoursePath(body = {}) {
         }
       }
     } else {
+      // --- Chương đã có PathId: cập nhật từng phần ---
       if (body.pathUpdate?.pathId) {
+        // BE: updatePathById
         const { data } = await axios.put(
           `${API_BASE}/mentor/paths/${encodeURIComponent(body.pathUpdate.pathId)}`,
           { set: body.pathUpdate.set ?? {} },
@@ -171,6 +191,7 @@ export async function saveCoursePath(body = {}) {
         pathId = body.pathUpdate.pathId;
       }
 
+      // BE: updateNodeById
       for (const item of body.nodesUpdate ?? []) {
         const requestBody = {};
         if (Object.keys(item.set ?? {}).length > 0) {
@@ -189,6 +210,7 @@ export async function saveCoursePath(body = {}) {
         if (!result.ok) return result;
       }
 
+      // BE: createNodeByPathId (+ materialsInsert con)
       for (const item of body.nodesInsert ?? []) {
         const targetPathId = item.pathId ?? pathId;
         const { data } = await axios.post(
@@ -227,6 +249,7 @@ export async function saveCoursePath(body = {}) {
         }
       }
 
+      // BE: updateMaterialById
       for (const item of body.materialsUpdate ?? []) {
         const requestBody = {};
         if (Object.keys(item.set ?? {}).length > 0) {
@@ -245,6 +268,7 @@ export async function saveCoursePath(body = {}) {
         if (!result.ok) return result;
       }
 
+      // BE: createMaterialByNodeId
       for (const item of body.materialsInsert ?? []) {
         const { data } = await axios.post(
           `${API_BASE}/mentor/nodes/${encodeURIComponent(item.nodeId)}/materials`,

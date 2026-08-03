@@ -35,6 +35,9 @@ export function AuthProvider({ children }) {
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('avatarUrl'); // Xóa luôn avatar cũ để không bị dính sang tài khoản khác
+    localStorage.removeItem('rawAvatar'); // Xóa ảnh thô chưa crop
+    localStorage.removeItem('rawFrame'); // Xóa khung viền cũ
   };
 
   return (

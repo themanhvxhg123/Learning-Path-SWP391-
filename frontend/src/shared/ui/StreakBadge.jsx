@@ -99,7 +99,7 @@ export default function StreakBadge({ userId, alwaysActive = false, variant = "p
     );
   }
 
-  // Logic variant pill (dành cho Header)
+  // Logic màu dành cho header (dành cho Header)
   const isGray = !hasStudiedToday && !alwaysActive;
   
   const bgColor = isGray ? "rgba(100,116,139,0.10)" : "rgba(234,88,12,0.10)";

@@ -16,8 +16,11 @@
  *      các section và câu hỏi; lưu vào state `sections` + baseline để so sánh thay đổi.
  *   2. CHỈNH SỬA SECTION — Mentor chọn kỹ năng → chọn bài/section → sửa đề + câu hỏi
  *      trong `MentorQuestionBankBuilderPanel`; thay đổi lưu tạm trong state (chưa gửi API).
- *   3. LƯU SECTION — Bấm "Cập nhật section" → xem preview payload → xác nhận
- *      → gọi `saveQuestionBankSection` → cập nhật baseline sau khi lưu thành công.
+ *   3. LƯU SECTION — Bấm "Cập nhật section" → xác nhận (ConfirmDialog)
+ *      → `validateQuestionBankSectionBeforeBackendSave` (lớp validate FE — xem
+ *        questionBankSectionSaveValidation.js, docs/QUESTION_BANK_VALIDATION_DEFENSE.md)
+ *      → nếu hợp lệ: upload Reading (nếu cần) → `saveQuestionBankSection` → baseline.
+ *      (Dialog preview JSON payload: bật SHOW_SECTION_SAVE_JSON_PREVIEW_DIALOG)
  *
  * Workspace question bank — axios tại trang.
  */
@@ -37,7 +40,6 @@ import MentorQuestionBankSkillNav from '@/features/mentor/components/questionBan
 import {
   TEST_SKILL_LISTENING,
   TEST_SKILL_READING,
-  TEST_SKILL_VOCABULARY,
   countActiveQuestionsBySkill,
   createQuestionBankSection,
   createQuestionBankSkillSections,
@@ -49,15 +51,12 @@ import {
   finalizeSectionAfterFullQuestionRestore,
   normalizeQuestionBankSectionForSave,
   scrollToQuestionBankItem,
-  validateQuestionBankSection,
-  getQuestionBankSectionValidationToast,
   hasPendingPersistedQuestionDeletes,
   SECTION_USE_FOR_TEST_FILTER,
   countSectionsByUseForTest,
   filterSectionsByUseForTest,
-  validateSectionUseForTestRule,
-  SECTION_USE_FOR_TEST_REQUIRES_QUESTION_MESSAGE,
 } from '@/features/mentor/utils/mentorTestContentUtils';
+import { validateQuestionBankSectionBeforeBackendSave } from '@/features/mentor/utils/questionBankSectionSaveValidation';
 import {
   buildSectionBaselinesMap,
   buildSectionEditorSnapshot,
@@ -79,11 +78,13 @@ import { saveQuestionBankSection } from '@/features/mentor/services/questionBank
 import { uploadTextMaterial } from '@/features/mentor/services/materialUploadService';
 import { isHtmlContentEmpty } from '@/features/mentor/utils/mentorCourseContentUtils';
 import { getChapterQuizConfig } from '@/features/mentor/services/chapterQuizConfigService';
-import { validateListeningReadingPublishedSectionQuota, validateVocabularySectionQuestionQuota, isSkillSectionRandomPick } from '@/features/mentor/utils/mentorChapterQuizConfigUtils';
 import { useNavigationGuard } from '@/context/NavigationGuardContext';
 
 // URL gốc của backend API (lấy từ biến môi trường hoặc localhost mặc định)
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/+$/, '');
+
+/** Bật true để dùng dialog preview JSON payload (dev); mặc định dùng ConfirmDialog. */
+const SHOW_SECTION_SAVE_JSON_PREVIEW_DIALOG = false;
 
 export default function MentorQuestionBankManagePage() {
   const navigate = useNavigate();
@@ -115,6 +116,8 @@ export default function MentorQuestionBankManagePage() {
   const sectionSourceBaselinesRef = useRef(sectionSourceBaselines);
   // unsavedNavDialogOpen: hiện dialog cảnh báo khi rời trang có thay đổi chưa lưu
   const [unsavedNavDialogOpen, setUnsavedNavDialogOpen] = useState(false);
+  // sectionSaveConfirmOpen: xác nhận lưu section (luồng mặc định)
+  const [sectionSaveConfirmOpen, setSectionSaveConfirmOpen] = useState(false);
   // savePreviewOpen: mở dialog xem trước payload trước khi gửi API lưu
   const [savePreviewOpen, setSavePreviewOpen] = useState(false);
   // savePreviewPayload: object payload sẽ gửi lên server (insert/update/delete)
@@ -123,6 +126,14 @@ export default function MentorQuestionBankManagePage() {
   const [savePreviewReadingText, setSavePreviewReadingText] = useState(null);
   const savePayloadRef = useRef(null);
   const savePreviewReadingTextRef = useRef(null);
+
+  const closeSectionSaveDialogs = () => {
+    setSectionSaveConfirmOpen(false);
+    setSavePreviewOpen(false);
+    setSavePreviewReadingText(null);
+    savePreviewReadingTextRef.current = null;
+    savePayloadRef.current = null;
+  };
   // confirmSaveInFlightRef: chặn double-click khi đang gọi API lưu
   const confirmSaveInFlightRef = useRef(false);
   // pendingNavigationRef: lưu hàm navigate chờ user xác nhận bỏ thay đổi
@@ -529,7 +540,7 @@ export default function MentorQuestionBankManagePage() {
   // ===== 8. HANDLERS — LƯU SECTION (SAVE FLOW) =====
 
   // Trigger: bấm nút "Cập nhật section" trên BuilderPanel
-  // Làm gì: flush editor → kiểm tra thay đổi → build payload → mở dialog preview
+  // Làm gì: flush editor → kiểm tra thay đổi → build payload → xác nhận lưu
   const handleUpdateSection = () => {
     if (!activeSection) return;
 
@@ -569,22 +580,34 @@ export default function MentorQuestionBankManagePage() {
       ? String(section.Description ?? '')
       : null;
     savePreviewReadingTextRef.current = readingHtml;
-    setSavePreviewReadingText(readingHtml);
     setSavePreviewPayload(previewPayload);
-    setSavePreviewOpen(true);
+    setSavePreviewReadingText(readingHtml);
+
+    if (SHOW_SECTION_SAVE_JSON_PREVIEW_DIALOG) {
+      setSavePreviewOpen(true);
+    } else {
+      setSectionSaveConfirmOpen(true);
+    }
+  };
+
+  const handleSectionSaveConfirmClose = () => {
+    if (updatingSectionId) return;
+    setSectionSaveConfirmOpen(false);
+    savePayloadRef.current = null;
+    savePreviewReadingTextRef.current = null;
+  };
+
+  const handleSectionSaveConfirm = () => {
+    handleConfirmSaveSection();
   };
 
   // Đóng dialog preview (không lưu) — chỉ khi không đang gọi API
   const handleSavePreviewClose = () => {
     if (updatingSectionId) return;
-    setSavePreviewOpen(false);
-    setSavePreviewReadingText(null);
-    savePreviewReadingTextRef.current = null;
-    savePayloadRef.current = null;
+    closeSectionSaveDialogs();
   };
 
-  // Trigger: bấm "Lưu thay đổi" trên dialog preview
-  // Luồng: validate → upload Reading HTML nếu cần → gọi saveQuestionBankSection → cập nhật baseline + state
+  // Luồng: validate FE (một cổng) → upload Reading nếu cần → saveQuestionBankSection → baseline
   const handleConfirmSaveSection = async () => {
     if (confirmSaveInFlightRef.current) return;
 
@@ -593,60 +616,6 @@ export default function MentorQuestionBankManagePage() {
     const section = sectionsRef.current.find((s) => s.tempId === activeSectionId) ?? activeSection;
     if (!section) return;
 
-    const useForTestError = validateSectionUseForTestRule(section);
-    if (useForTestError.isUseForTest) {
-      setSectionErrors((prev) => ({
-        ...prev,
-        [section.tempId]: {
-          ...(prev[section.tempId] ?? {}),
-          isUseForTest: useForTestError.isUseForTest,
-        },
-      }));
-      toast.error(SECTION_USE_FOR_TEST_REQUIRES_QUESTION_MESSAGE);
-      return;
-    }
-
-    if (isSkillSectionRandomPick(section.SkillType)) {
-      const quotaError = validateListeningReadingPublishedSectionQuota(
-        sectionsRef.current,
-        section.SkillType,
-        chapterQuizConfig,
-      );
-      if (quotaError.isUseForTest) {
-        setSectionErrors((prev) => ({
-          ...prev,
-          [section.tempId]: {
-            ...(prev[section.tempId] ?? {}),
-            isUseForTest: quotaError.isUseForTest,
-          },
-        }));
-        toast.error(quotaError.isUseForTest);
-        setSavePreviewOpen(false);
-        savePreviewReadingTextRef.current = null;
-        savePayloadRef.current = null;
-        return;
-      }
-    }
-
-    if (section.SkillType === TEST_SKILL_VOCABULARY) {
-      const vocabQuotaError = validateVocabularySectionQuestionQuota(section, chapterQuizConfig);
-      if (vocabQuotaError.isUseForTest || vocabQuotaError._questions) {
-        setSectionErrors((prev) => ({
-          ...prev,
-          [section.tempId]: {
-            ...(prev[section.tempId] ?? {}),
-            ...vocabQuotaError,
-          },
-        }));
-        toast.error(vocabQuotaError.isUseForTest ?? vocabQuotaError._questions);
-        setSavePreviewOpen(false);
-        savePreviewReadingTextRef.current = null;
-        savePayloadRef.current = null;
-        return;
-      }
-    }
-
-    const normalized = normalizeQuestionBankSectionForSave(section);
     const previewPayload = savePayloadRef.current ?? buildQuestionBankSectionSavePayload(
       section,
       {
@@ -660,20 +629,20 @@ export default function MentorQuestionBankManagePage() {
     );
     const deleteQuestionsOnly = isQuestionBankDeleteOnlyPayload(previewPayload);
 
-    if (!deleteQuestionsOnly) {
-      const errors = validateQuestionBankSection(normalized, {
-        forSave: true,
-        allSections: sectionsRef.current,
-      });
-      if (Object.keys(errors).length > 0) {
-        setSectionErrors((prev) => ({ ...prev, [section.tempId]: errors }));
-        const validationToast = getQuestionBankSectionValidationToast(errors, section);
-        if (validationToast) toast.error(validationToast);
-        setSavePreviewOpen(false);
-        savePreviewReadingTextRef.current = null;
-        savePayloadRef.current = null;
-        return;
-      }
+    const validation = validateQuestionBankSectionBeforeBackendSave({
+      section,
+      allSections: sectionsRef.current,
+      chapterQuizConfig,
+      deleteQuestionsOnly,
+    });
+    if (!validation.ok) {
+      setSectionErrors((prev) => ({
+        ...prev,
+        [section.tempId]: validation.errors,
+      }));
+      toast.error(validation.toastMessage);
+      closeSectionSaveDialogs();
+      return;
     }
 
     confirmSaveInFlightRef.current = true;
@@ -744,10 +713,7 @@ export default function MentorQuestionBankManagePage() {
       }
 
       if (!hasSectionSaveOps) {
-        setSavePreviewOpen(false);
-        setSavePreviewReadingText(null);
-        savePreviewReadingTextRef.current = null;
-        savePayloadRef.current = null;
+        closeSectionSaveDialogs();
         toast.success(result.message ?? 'Đã lưu thay đổi.');
         return;
       }
@@ -833,10 +799,7 @@ export default function MentorQuestionBankManagePage() {
         }));
       }
       setSectionErrors((prev) => ({ ...prev, [section.tempId]: undefined }));
-      setSavePreviewOpen(false);
-      setSavePreviewReadingText(null);
-      savePreviewReadingTextRef.current = null;
-      savePayloadRef.current = null;
+      closeSectionSaveDialogs();
       toast.success(result.message ?? 'Đã cập nhật section.');
     } finally {
       confirmSaveInFlightRef.current = false;
@@ -1069,15 +1032,34 @@ export default function MentorQuestionBankManagePage() {
         cancelLabel="Hủy"
       />
 
-      {/* Dialog xem trước payload API trước khi lưu section */}
-      <MentorQuestionBankSectionSavePreviewDialog
-        open={savePreviewOpen}
-        payload={savePreviewPayload}
-        readingTextHtml={savePreviewReadingText}
+      <ConfirmDialog
+        open={sectionSaveConfirmOpen}
+        onClose={handleSectionSaveConfirmClose}
+        onConfirm={handleSectionSaveConfirm}
+        title="Cập nhật section"
+        message={
+          activeSection
+            ? `Lưu thay đổi cho section "${String(
+              activeSection.SectionTitle || activeSection.DisplayName || 'hiện tại',
+            ).trim()}"?`
+            : 'Lưu thay đổi cho section hiện tại?'
+        }
+        confirmLabel="Lưu thay đổi"
+        cancelLabel="Hủy"
         loading={Boolean(updatingSectionId)}
-        onClose={handleSavePreviewClose}
-        onConfirm={handleConfirmSaveSection}
       />
+
+      {/* Dialog xem trước payload API (JSON) — giữ cho dev: SHOW_SECTION_SAVE_JSON_PREVIEW_DIALOG */}
+      {SHOW_SECTION_SAVE_JSON_PREVIEW_DIALOG ? (
+        <MentorQuestionBankSectionSavePreviewDialog
+          open={savePreviewOpen}
+          payload={savePreviewPayload}
+          readingTextHtml={savePreviewReadingText}
+          loading={Boolean(updatingSectionId)}
+          onClose={handleSavePreviewClose}
+          onConfirm={handleConfirmSaveSection}
+        />
+      ) : null}
     </Box>
   );
 }

@@ -35,6 +35,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
+import InputAdornment from '@mui/material/InputAdornment';
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
@@ -144,44 +145,69 @@ export default function RegisterPage() {
 
           <div className="form-group">
             <label htmlFor="reg-dob">Ngày sinh</label>
-            <div className="input-wrapper">
-              <span className="input-icon" aria-hidden="true">
-                <CakeOutlinedIcon />
-              </span>
-              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
-                <DatePicker
-                  format="DD/MM/YYYY"
-                  maxDate={dayjs()}
-                  value={form.dateOfBirth ? dayjs(form.dateOfBirth) : null}
-                  onChange={(newVal) => {
-                    setForm(prev => ({ ...prev, dateOfBirth: newVal ? newVal.format('YYYY-MM-DD') : '' }));
-                    setErrors(prev => ({ ...prev, dateOfBirth: '' }));
-                  }}
-                  disabled={isSubmitting}
-                  slotProps={{
-                    textField: {
-                      id: "reg-dob",
-                      placeholder: "DD/MM/YYYY",
-                      fullWidth: true,
-                      error: !!errors.dateOfBirth,
-                      sx: {
-                        "& .MuiInputBase-root": {
-                          height: "46px",
-                          borderRadius: "10px",
-                          backgroundColor: "transparent",
-                          fontSize: "15px",
-                          transition: "all 0.2s ease",
-                          "& fieldset": { border: "none" }
+            <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="vi">
+              <DatePicker
+                format="DD/MM/YYYY"
+                maxDate={dayjs()}
+                value={form.dateOfBirth ? dayjs(form.dateOfBirth) : null}
+                onChange={(newVal) => {
+                  setForm(prev => ({ ...prev, dateOfBirth: newVal ? newVal.format('YYYY-MM-DD') : '' }));
+                  setErrors(prev => ({ ...prev, dateOfBirth: '' }));
+                }}
+                disabled={isSubmitting}
+                slotProps={{
+                  textField: {
+                    id: "reg-dob",
+                    placeholder: "DD/MM/YYYY",
+                    fullWidth: true,
+                    error: !!errors.dateOfBirth,
+                    InputProps: {
+                      startAdornment: (
+                        <InputAdornment position="start" sx={{ pl: '2px', '& svg': { color: 'var(--clr-text-dim)', fontSize: '20px', transition: 'color 0.25s' } }}>
+                          <CakeOutlinedIcon />
+                        </InputAdornment>
+                      )
+                    },
+                    sx: {
+                      "& .MuiOutlinedInput-root": {
+                        height: "46px",
+                        borderRadius: "12px",
+                        backgroundColor: "var(--clr-input-bg)",
+                        color: "var(--clr-text)",
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: "14px",
+                        transition: "border-color 0.25s, background 0.25s, box-shadow 0.25s",
+                        "& fieldset": { 
+                          borderColor: "var(--clr-input-br)",
+                          borderWidth: "1px",
                         },
-                        "& .MuiOutlinedInput-input": {
-                          padding: "0 14px 0 44px",
+                        "&:hover fieldset": { 
+                          borderColor: "var(--clr-input-br)",
+                        },
+                        "&.Mui-focused": {
+                          backgroundColor: "var(--clr-bg-paper)",
+                          "& fieldset": {
+                            borderColor: "var(--clr-primary)",
+                            borderWidth: "1px",
+                          },
+                          boxShadow: "0 0 0 3px rgba(8, 145, 178, 0.2)",
+                          "& .MuiInputAdornment-root svg": {
+                            color: "var(--clr-primary)",
+                          }
+                        }
+                      },
+                      "& .MuiOutlinedInput-input": {
+                        paddingLeft: "8px",
+                        "&::placeholder": {
+                          color: "var(--clr-placeholder)",
+                          opacity: 1,
                         }
                       }
                     }
-                  }}
-                />
-              </LocalizationProvider>
-            </div>
+                  }
+                }}
+              />
+            </LocalizationProvider>
             {errors.dateOfBirth && <p className="field-error">{errors.dateOfBirth}</p>}
           </div>
 
